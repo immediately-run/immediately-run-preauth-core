@@ -34,6 +34,7 @@ export type Capability =
   | 'editor:requestEdit'
   | 'vcs:read'
   | 'vcs:reset'
+  | 'dnd:source'
   | 'catalog:read'
   | 'commands:read'
   | 'commands:run'
@@ -172,6 +173,21 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // `overridePolicy` strips it on a repoint). Marked maximally-explicit so the one
   // first-party line that does carry it renders with the scariest styling.
   'vcs:reset': { kind: 'action', tier: 'first-party-only', since: '1.1.0', maximallyExplicit: true },
+  // Initiate a host-mediated cross-app DRAG-OUT into the previewed app
+  // (FILE_EXPLORER_SPEC §7, R3-83). The source app calls `startItemDrag(item)`;
+  // the host draws the trusted drag ghost, tracks the pointer across the
+  // cross-origin iframe boundary (which native HTML5 DnD cannot cross), and on a
+  // drop over the preview delivers `{ item, from, position }` to a SUBSCRIBED
+  // receiver. Synthesizing a drag INTO a sibling app is an injection / clickjacking
+  // primitive (FE-DND-1), so this is **first-party-only**: only a pinned
+  // build-default chrome binding (the file explorer) may hold it — a fork / preview
+  // / third-party binding can NEVER initiate a cross-app drag, enforced by tier
+  // (`buildConsent` refuses it to a non-first-party binding, never offering a
+  // consent line, exactly like `vcs:reset`). Marked maximally-explicit so the one
+  // first-party line that carries it renders with the scariest styling (same tier
+  // as `editor:open`/`editor:write`/`vcs:reset`). Receiving a drop needs NO new
+  // grant — the previewed app opts in by subscribing (`onItemDrop`).
+  'dnd:source': { kind: 'action', tier: 'first-party-only', since: '1.2.0', maximallyExplicit: true },
   // The §5.5 method catalog (the app's own filtered RPC surface) — baseline:
   // every app may discover what IT can call; the list is grant-filtered so it
   // reveals nothing the app couldn't already invoke.
