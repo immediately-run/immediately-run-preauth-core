@@ -133,7 +133,7 @@ export const appKeyTouchFields = (s: MintSentinels): Record<string, unknown> => 
  *  grant doc (merge). `mintPath` defaults to `interactive`; `grantedAt`/`lastUsedAt`
  *  drive the §8.15 90-day-unused expiry. */
 export const appSpaceGrantFields = (
-  params: Pick<GrantSpaceParams, 'name' | 'subtree' | 'mode' | 'declaredUri' | 'mintPath' | 'parentGrantId'>,
+  params: Pick<GrantSpaceParams, 'name' | 'subtree' | 'mode' | 'rules' | 'declaredUri' | 'mintPath' | 'parentGrantId'>,
   s: MintSentinels,
 ): Record<string, unknown> =>
   defined({
@@ -141,8 +141,16 @@ export const appSpaceGrantFields = (
     grantedAt: s.serverTimestamp(),
     lastUsedAt: s.serverTimestamp(),
     name: params.name,
+    // Plan 12 §8.7: `rules` is authoritative; `subtree`/`mode` are kept as the
+    // deprecated `rules[0]` mirror for not-yet-migrated readers. When no rule-set
+    // is given, derive a single-rule set from the legacy scope so the backend
+    // single-scope mint path still emits `rules` (byte-identical with site-main).
     subtree: params.subtree,
     mode: params.mode,
+    rules:
+      params.rules && params.rules.length > 0
+        ? params.rules
+        : [{ subtree: params.subtree ?? '/', mode: params.mode ?? 'rw' }],
     declaredUri: params.declaredUri,
     mintPath: params.mintPath ?? 'interactive',
     parentGrantId: params.parentGrantId,

@@ -71,16 +71,30 @@ describe('docLayout — field objects', () => {
     expect(appCountFields(sentinels)).toEqual({ created: { __increment: 1 } });
   });
 
-  it('appSpaceGrantFields stamps the three timestamps + mintPath default', () => {
+  it('appSpaceGrantFields stamps the three timestamps + mintPath default + derived rules', () => {
     expect(appKeyTouchFields(sentinels)).toEqual({ touchedAt: TS });
+    // No `rules` given → derive a single-rule set from the legacy subtree/mode
+    // (plan 12 §8.7), so the backend single-scope mint path still emits `rules`.
     expect(appSpaceGrantFields({ mode: 'rw', declaredUri: 'cache' }, sentinels)).toEqual({
       boundAt: TS,
       grantedAt: TS,
       lastUsedAt: TS,
       mode: 'rw',
+      rules: [{ subtree: '/', mode: 'rw' }],
       declaredUri: 'cache',
       mintPath: 'interactive',
     });
+    // A subtree-scoped legacy grant derives the matching single rule.
+    expect(appSpaceGrantFields({ subtree: '/docs', mode: 'ro' }, sentinels).rules).toEqual([
+      { subtree: '/docs', mode: 'ro' },
+    ]);
+    // An explicit rule-SET is authoritative (site-main's merged append passes it).
+    expect(
+      appSpaceGrantFields(
+        { rules: [{ subtree: '/a', mode: 'rw' }, { subtree: '/b/c.mdx', mode: 'ro' }] },
+        sentinels,
+      ).rules,
+    ).toEqual([{ subtree: '/a', mode: 'rw' }, { subtree: '/b/c.mdx', mode: 'ro' }]);
     // explicit policy provenance is preserved
     expect(appSpaceGrantFields({ mode: 'ro', mintPath: 'policy' }, sentinels).mintPath).toBe('policy');
   });
