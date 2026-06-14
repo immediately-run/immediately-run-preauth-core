@@ -46,7 +46,7 @@ export declare const appKeyTouchFields: (s: MintSentinels) => Record<string, unk
 /** `user-app-spaces/{uid}/apps/{appKey}/spaces/{spaceId}` — the durable §8.7
  *  grant doc (merge). `mintPath` defaults to `interactive`; `grantedAt`/`lastUsedAt`
  *  drive the §8.15 90-day-unused expiry. */
-export declare const appSpaceGrantFields: (params: Pick<GrantSpaceParams, "name" | "subtree" | "mode" | "declaredUri" | "mintPath" | "parentGrantId">, s: MintSentinels) => Record<string, unknown>;
+export declare const appSpaceGrantFields: (params: Pick<GrantSpaceParams, "name" | "subtree" | "mode" | "rules" | "declaredUri" | "mintPath" | "parentGrantId">, s: MintSentinels) => Record<string, unknown>;
 /** Union net:fetch host rules by origin (incoming wins) — the "consent
  *  accumulates" merge both adapters apply before writing the host set. */
 export declare const mergeNetFetchHosts: (existing: readonly NetFetchHost[], incoming: readonly NetFetchHost[]) => NetFetchHost[];
