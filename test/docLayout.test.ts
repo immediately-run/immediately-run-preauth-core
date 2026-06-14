@@ -1,0 +1,123 @@
+// The byte-faithful wire layout (§0.1) — these assertions pin the EXACT paths and
+// field objects every grant-mint write produces. Both `FirestoreSpaceStore` (Web
+// SDK) and the backend `AdminMintStore` (admin SDK) build their writes from these
+// helpers, so a change that would make the two adapters disagree must change a
+// value asserted here first. The sentinels are stubbed with stable markers so the
+// shape (not a live Firestore value) is what's compared.
+
+import {
+  appCountFields,
+  appCountPath,
+  appKeyPath,
+  appKeyTouchFields,
+  appSpaceGrantFields,
+  appSpacePath,
+  defined,
+  GRANT_EXPIRY_MS,
+  grantKey,
+  memberPath,
+  mergeNetFetchHosts,
+  netFetchGrantFields,
+  ownerMemberFields,
+  ownerUserSpaceFields,
+  spaceDocFields,
+  spacePath,
+  userCountFields,
+  userCountPath,
+  userPrincipal,
+  userSpacePath,
+  type MintSentinels,
+} from '../src/docLayout';
+
+const TS = '<<server-timestamp>>';
+const sentinels: MintSentinels = {
+  serverTimestamp: () => TS,
+  increment: (n: number) => ({ __increment: n }),
+};
+
+describe('docLayout — paths', () => {
+  it('lays out the documented collection/doc paths', () => {
+    expect(spacePath('s1')).toEqual(['spaces', 's1']);
+    expect(memberPath('s1', userPrincipal('u1'))).toEqual(['spaces', 's1', 'members', 'user:u1']);
+    expect(userSpacePath('u1', 's1')).toEqual(['user-spaces', 'u1', 'spaces', 's1']);
+    expect(appKeyPath('u1', 'app')).toEqual(['user-app-spaces', 'u1', 'apps', 'app']);
+    expect(appSpacePath('u1', 'app', 's1')).toEqual([
+      'user-app-spaces', 'u1', 'apps', 'app', 'spaces', 's1',
+    ]);
+    expect(userCountPath('u1')).toEqual(['space-counts', 'u1']);
+    expect(appCountPath('u1', 'app')).toEqual(['space-counts', 'u1', 'apps', 'app']);
+  });
+});
+
+describe('docLayout — field objects', () => {
+  it('spaceDocFields omits absent optionals (defined())', () => {
+    expect(spaceDocFields({ owner: 'u1' }, sentinels)).toEqual({ owner: 'u1', createdAt: TS });
+    expect(spaceDocFields({ owner: 'u1', name: 'n', createdInNamespace: 'ns' }, sentinels)).toEqual({
+      owner: 'u1',
+      createdAt: TS,
+      name: 'n',
+      createdInNamespace: 'ns',
+    });
+  });
+
+  it('owner member + user-space docs', () => {
+    expect(ownerMemberFields(sentinels)).toEqual({ role: 'owner', addedAt: TS });
+    expect(ownerUserSpaceFields({ owner: 'u1', name: 'n' })).toEqual({ role: 'owner', owner: 'u1', name: 'n' });
+    expect(ownerUserSpaceFields({ owner: 'u1' })).toEqual({ role: 'owner', owner: 'u1' });
+  });
+
+  it('counters use the increment sentinel', () => {
+    expect(userCountFields(sentinels)).toEqual({ owned: { __increment: 1 } });
+    expect(appCountFields(sentinels)).toEqual({ created: { __increment: 1 } });
+  });
+
+  it('appSpaceGrantFields stamps the three timestamps + mintPath default', () => {
+    expect(appKeyTouchFields(sentinels)).toEqual({ touchedAt: TS });
+    expect(appSpaceGrantFields({ mode: 'rw', declaredUri: 'cache' }, sentinels)).toEqual({
+      boundAt: TS,
+      grantedAt: TS,
+      lastUsedAt: TS,
+      mode: 'rw',
+      declaredUri: 'cache',
+      mintPath: 'interactive',
+    });
+    // explicit policy provenance is preserved
+    expect(appSpaceGrantFields({ mode: 'ro', mintPath: 'policy' }, sentinels).mintPath).toBe('policy');
+  });
+
+  it('net:fetch grant stamps grantedAt only on first mint', () => {
+    const hosts = [{ origin: 'https://a.example' }];
+    expect(netFetchGrantFields(hosts, false, sentinels)).toEqual({
+      netFetch: hosts,
+      netFetchGrantedAt: TS,
+      netFetchLastUsedAt: TS,
+    });
+    // re-grant: grantedAt is NOT re-stamped (omitted by defined())
+    expect(netFetchGrantFields(hosts, true, sentinels)).toEqual({
+      netFetch: hosts,
+      netFetchLastUsedAt: TS,
+    });
+  });
+
+  it('mergeNetFetchHosts unions by origin, incoming wins', () => {
+    const existing = [{ origin: 'https://a.example' }, { origin: 'https://b.example', methods: ['GET'] }];
+    const incoming = [{ origin: 'https://b.example', methods: ['POST'] }, { origin: 'https://c.example' }];
+    expect(mergeNetFetchHosts(existing, incoming)).toEqual([
+      { origin: 'https://a.example' },
+      { origin: 'https://b.example', methods: ['POST'] },
+      { origin: 'https://c.example' },
+    ]);
+  });
+});
+
+describe('docLayout — keys + constants', () => {
+  it('grantKey joins appKey::spaceId', () => {
+    expect(grantKey('github:acme/app', 's1')).toBe('github:acme/app::s1');
+  });
+  it('GRANT_EXPIRY_MS is 90 days', () => {
+    expect(GRANT_EXPIRY_MS).toBe(90 * 24 * 60 * 60 * 1000);
+  });
+  it('defined() drops only undefined (keeps null/0/empty-string)', () => {
+    expect(defined({ a: 1, b: undefined, c: 0, d: '', e: null })).toEqual({ a: 1, c: 0, d: '', e: null });
+  });
+});
