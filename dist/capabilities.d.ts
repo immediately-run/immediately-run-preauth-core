@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'mounts:read' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'mounts:read' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -13,10 +13,10 @@ export interface CapabilityDef {
      *  elevated capability can be EARNED by a URL-loaded/previewed app via lazy
      *  first-use or manifest-`requests` consent and recorded as a per-`(user,
      *  appKey)` grant; non-app-scoped elevated caps are never earnable that way
-     *  (region binding only). The app-scoped set is `net:fetch`, `task:invoke`, and
+     *  (region binding only). The app-scoped set is `net:fetch`, `task:invoke`,
      *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
-     *  in R3-33d; the durable grant participates in the §8.15 90-day expiry like any
-     *  app-scoped grant). */
+     *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
+     *  participates in the §8.15 90-day expiry like any app-scoped grant. */
     appScoped?: boolean;
     /** Render this capability's consent line with the platform's **maximally-
      *  explicit** (scariest) styling, never bundled into a combined prompt
