@@ -163,6 +163,13 @@ exports.CAPABILITIES = {
     // cannot earn it via lazy/manifest consent (region binding only) — driving the
     // user's local machine is first-party-grade authority, never silently earnable.
     'agent:session': { kind: 'action', tier: 'elevated', since: '1.2.0' },
+    // R3-74 (P3-72, LLM_AND_AGENTS_SPEC §3.3/§4, D4): a sibling agent app reading the
+    // PREVIEWED app's own build/transpile errors + captured console — the in-browser
+    // analogue of a local agent reading compiler output. App-scoped elevated so a
+    // URL-loaded agent can EARN it via lazy/manifest consent (a clean, withholdable
+    // consent line, D4); read-only and scoped to the paired previewed app's own
+    // diagnostics (no cross-app bleed — enforced host-side by the channel projection).
+    'diagnostics:read': { kind: 'action', tier: 'elevated', since: '1.2.0', appScoped: true },
 };
 /** The current registry/vocabulary version (§5.11). Bumped to 1.2.0 with the
  *  per-user settings-space capabilities (`settings:app`/`settings:fork`/
