@@ -153,7 +153,16 @@ exports.CAPABILITIES = {
     'secrets:add': { kind: 'action', tier: 'elevated', since: '1.1.0' },
     'secrets:list': { kind: 'read', tier: 'elevated', since: '1.1.0' },
     'secrets:revoke': { kind: 'action', tier: 'elevated', since: '1.1.0' },
-    'agent:session': { kind: 'action', tier: 'elevated', since: '1.0.0' },
+    // R3-76 (P3-74, LLM_AND_AGENTS_SPEC §3.4/§4; LOCAL_DEV_AUTHED_SERVER_SPEC):
+    // open and drive a user-local Claude Code via the bridge — the in-browser host
+    // kernel connects OUT to the CLI's authenticated localhost server and runs each
+    // tool call through its §8.4-gated invoke(). Promoted from proposed/since:null
+    // to a defined, gated, elevated capability landing in the current 1.2.0
+    // registry — gated host-side by `protocol-agent` (site-main actionGate) and held
+    // by the Agent-panel system app. Elevated and NOT app-scoped: a URL-loaded app
+    // cannot earn it via lazy/manifest consent (region binding only) — driving the
+    // user's local machine is first-party-grade authority, never silently earnable.
+    'agent:session': { kind: 'action', tier: 'elevated', since: '1.2.0' },
 };
 /** The current registry/vocabulary version (§5.11). Bumped to 1.2.0 with the
  *  per-user settings-space capabilities (`settings:app`/`settings:fork`/
