@@ -170,11 +170,20 @@ exports.CAPABILITIES = {
     // consent line, D4); read-only and scoped to the paired previewed app's own
     // diagnostics (no cross-app bleed — enforced host-side by the channel projection).
     'diagnostics:read': { kind: 'action', tier: 'elevated', since: '1.2.0', appScoped: true },
+    // SERVICE_PROVIDERS_SPEC `llm.chat@1` / LLM_AND_AGENTS_SPEC D5: invoke the shared,
+    // provider-agnostic chat slot. The app calls ONE slot; the host resolves which
+    // vendor answers from the key the user holds (`SecretView.boundOrigin`) + their
+    // `preferredImplementation` choice, injects the key host-side (§6, look-at-nothing
+    // proxy), and streams normalized deltas back. The app never names a vendor, never
+    // sees the key, and needs NO `net:fetch`/`secrets` grant of its own — only this.
+    // Elevated + app-scoped: a fork/previewed app EARNS it via lazy/manifest consent
+    // (the fork-needs-more-caps story), recorded as a per-(user,appKey) §8.15 grant.
+    'llm:chat': { kind: 'action', tier: 'elevated', since: '1.3.0', appScoped: true },
 };
-/** The current registry/vocabulary version (§5.11). Bumped to 1.2.0 with the
- *  per-user settings-space capabilities (`settings:app`/`settings:fork`/
- *  `settings:all`), mirroring capabilities.json. */
-exports.REGISTRY_VERSION = '1.2.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.3.0 with the
+ *  provider-agnostic `llm:chat` capability (the `llm.chat@1` slot), mirroring
+ *  capabilities.json. (1.2.0 added the per-user settings-space capabilities.) */
+exports.REGISTRY_VERSION = '1.3.0';
 /** Is `cap` a known kernel capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
