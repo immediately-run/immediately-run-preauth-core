@@ -40,16 +40,16 @@ export const grantKey = (appKey: string, spaceId: string): string =>
  *  touches it. */
 export const GRANT_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
-/** The member doc-ID for a user who can be granted access to a space:
- *  `user:<uid>`. VOCAB NOTE (core_concepts §4 reserved-word): this is a **grantee**
- *  (a space member — the `uid`/`gid` of `setSpaceRole`), NOT the authority-context
- *  Principal. The name `userPrincipal` and the `memberPath(…, principal)` param
- *  predate the §4 rename; renaming the TS symbols to `grantee` is the cross-repo
- *  RENAME-1 track (see REFACTOR_CANDIDATES.md / 07-preauth-core.md Phase 2). The
- *  stored Firestore path segment (`spaces/{id}/members/{user:<uid>}`) is a doc-ID,
- *  not a field literally named `principal`, so the rename is code-symbol-only — no
- *  data migration — and is deferred until coordinated with SDK + site-main + backend. */
-export const userPrincipal = (uid: string): string => `user:${uid}`;
+/** The member doc-ID for a user who can be granted access to a space: `user:<uid>`.
+ *  This is a **grantee** (a space member — the `uid`/`gid` of `setSpaceRole`), NOT the
+ *  authority-context Principal (core_concepts §4 reserved-word; SPEC_CODE_DEBT §7.1
+ *  RENAME-1). The stored Firestore path segment is a doc-ID, not a field literally
+ *  named `principal`, so this rename is code-symbol-only — no data migration. */
+export const granteeId = (uid: string): string => `user:${uid}`;
+/** @deprecated use {@link granteeId}. Kept as an alias for the `userPrincipal →
+ *  granteeId` migration (the SDK + site-main + backend RENAME-1 track); removed once
+ *  consumers migrate. */
+export const userPrincipal = granteeId;
 
 /** Drop undefined values — Firestore rejects them. The two adapters historically
  *  each had their own copy of this; sharing it keeps the "omit absent optionals"
@@ -60,11 +60,11 @@ export const defined = <T extends Record<string, unknown>>(obj: T): T =>
 // --- document paths (pure, sentinel-free) -----------------------------------
 
 export const spacePath = (spaceId: string): DocPath => ['spaces', spaceId];
-export const memberPath = (spaceId: string, principal: string): DocPath => [
+export const memberPath = (spaceId: string, grantee: string): DocPath => [
   'spaces',
   spaceId,
   'members',
-  principal,
+  grantee,
 ];
 export const userSpacePath = (uid: string, spaceId: string): DocPath => [
   'user-spaces',

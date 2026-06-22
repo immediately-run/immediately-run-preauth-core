@@ -16,7 +16,7 @@
 // `.set()`/`.update()` is the only thing each adapter does itself. Drift is then
 // impossible without editing a helper both consume.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.userPrincipal = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
+exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.userPrincipal = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -26,17 +26,17 @@ exports.grantKey = grantKey;
  *  use after expiry re-prompts. Baseline needs no grant record, so this never
  *  touches it. */
 exports.GRANT_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
-/** The member doc-ID for a user who can be granted access to a space:
- *  `user:<uid>`. VOCAB NOTE (core_concepts §4 reserved-word): this is a **grantee**
- *  (a space member — the `uid`/`gid` of `setSpaceRole`), NOT the authority-context
- *  Principal. The name `userPrincipal` and the `memberPath(…, principal)` param
- *  predate the §4 rename; renaming the TS symbols to `grantee` is the cross-repo
- *  RENAME-1 track (see REFACTOR_CANDIDATES.md / 07-preauth-core.md Phase 2). The
- *  stored Firestore path segment (`spaces/{id}/members/{user:<uid>}`) is a doc-ID,
- *  not a field literally named `principal`, so the rename is code-symbol-only — no
- *  data migration — and is deferred until coordinated with SDK + site-main + backend. */
-const userPrincipal = (uid) => `user:${uid}`;
-exports.userPrincipal = userPrincipal;
+/** The member doc-ID for a user who can be granted access to a space: `user:<uid>`.
+ *  This is a **grantee** (a space member — the `uid`/`gid` of `setSpaceRole`), NOT the
+ *  authority-context Principal (core_concepts §4 reserved-word; SPEC_CODE_DEBT §7.1
+ *  RENAME-1). The stored Firestore path segment is a doc-ID, not a field literally
+ *  named `principal`, so this rename is code-symbol-only — no data migration. */
+const granteeId = (uid) => `user:${uid}`;
+exports.granteeId = granteeId;
+/** @deprecated use {@link granteeId}. Kept as an alias for the `userPrincipal →
+ *  granteeId` migration (the SDK + site-main + backend RENAME-1 track); removed once
+ *  consumers migrate. */
+exports.userPrincipal = exports.granteeId;
 /** Drop undefined values — Firestore rejects them. The two adapters historically
  *  each had their own copy of this; sharing it keeps the "omit absent optionals"
  *  rule identical on both sides. */
@@ -45,11 +45,11 @@ exports.defined = defined;
 // --- document paths (pure, sentinel-free) -----------------------------------
 const spacePath = (spaceId) => ['spaces', spaceId];
 exports.spacePath = spacePath;
-const memberPath = (spaceId, principal) => [
+const memberPath = (spaceId, grantee) => [
     'spaces',
     spaceId,
     'members',
-    principal,
+    grantee,
 ];
 exports.memberPath = memberPath;
 const userSpacePath = (uid, spaceId) => [

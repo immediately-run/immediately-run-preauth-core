@@ -1,6 +1,6 @@
 {
   "name": "@immediately-run/preauth-core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "The shared §8.9 pre-auth target check + the single grant-mint path (mintConsentedGrants) + the capability vocabulary + the byte-faithful grant/space/net-fetch document layout. Consumed by site-main (browser Firestore) and the backend (admin Firestore) so there is ONE gate, ONE mint path, ONE wire layout.",
   "license": "UNLICENSED",
   "repository": {
