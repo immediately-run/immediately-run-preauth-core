@@ -1,5 +1,6 @@
-// The capability-definition registry — the KERNEL source of truth
-// (UI_AS_APPS_SPEC §5.11 / §8.2). Capabilities are a CLOSED vocabulary: apps
+// The capability-definition registry — the Host-core source of truth
+// (UI_AS_APPS_SPEC §5.11 / §8.2). "Host-core capabilities are a closed,
+// kernel-defined vocabulary an app cannot extend" (core_concepts §5): apps
 // cannot mint one, only be granted one. This module mirrors docs/capabilities.json
 // (the machine-readable companion); the host build is authoritative.
 //
@@ -60,7 +61,10 @@ export interface CapabilityDef {
    *  elevated capability can be EARNED by a URL-loaded/previewed app via lazy
    *  first-use or manifest-`requests` consent and recorded as a per-`(user,
    *  appKey)` grant; non-app-scoped elevated caps are never earnable that way
-   *  (region binding only). The app-scoped set is `net:fetch`, `task:invoke`,
+   *  (region binding only). In core_concepts §5 terms the consent-path is the
+   *  "above-the-floor, up-to-the-ceiling → first-use consent" band: an app-scoped
+   *  elevated cap sits in that band for the stage principal, a non-app-scoped one
+   *  is above the stage ceiling (granted only by a slot's elevated principal). The app-scoped set is `net:fetch`, `task:invoke`,
    *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
    *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
    *  participates in the §8.15 90-day expiry like any app-scoped grant. */
@@ -69,8 +73,9 @@ export interface CapabilityDef {
    *  explicit** (scariest) styling, never bundled into a combined prompt
    *  (decision #2). The most dangerous writes carry it: `contribute:direct`
    *  (commit without review) and `editor:write` (mutate the working tree).
-   *  Independent of tier — it governs HOW the line is shown, not WHO may hold the
-   *  capability (a first-party-only cap is still refused to a fork regardless). */
+   *  Independent of tier — it governs HOW the first-use consent line (core_concepts
+   *  §5: the above-floor consent band) is shown, not WHO may hold the capability
+   *  (a first-party-only cap is still refused to a fork regardless of styling). */
   maximallyExplicit?: boolean;
 }
 
@@ -119,7 +124,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // Mutate the editor session's working tree — create/delete/rename/upload a file
   // (migrate-sidebars Phase 04, EDITOR_AS_APP_SPEC §5.2). A NARROW, per-path gated
   // action: the file explorer NAMES a path and the HOST performs the COW write
-  // (and notifies Sandpack) — the COW/journal stays in the kernel (§2/§4). The
+  // (and notifies Sandpack) — the COW/journal stays in the Host (§2/§4). The
   // explorer holds no working-tree write PORT (that broad authority is the
   // editor app's `editor:document`); it must ask. **Elevated, not first-party-only**
   // (EDITOR_AS_APP_SPEC §5.1 forkability rule): mutating the user's OWN working copy
@@ -186,9 +191,12 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // / third-party binding can NEVER initiate a cross-app drag, enforced by tier
   // (`buildConsent` refuses it to a non-first-party binding, never offering a
   // consent line, exactly like `vcs:reset`). Marked maximally-explicit so the one
-  // first-party line that carries it renders with the scariest styling (same tier
-  // as `editor:open`/`editor:write`/`vcs:reset`). Receiving a drop needs NO new
-  // grant — the previewed app opts in by subscribing (`onItemDrop`).
+  // first-party line that carries it renders with the scariest styling. (Tier is
+  // `first-party-only`, the SAME tier as `vcs:reset` — NOT `editor:write`, which is
+  // elevated/consentable: S4 in spec-review-3.5 corrected the FILE_EXPLORER prose
+  // that wrongly equated this tier with `editor:write`. CAPABILITY_REFERENCE records
+  // `dnd:source` as first-party-only, which this dict matches.) Receiving a drop
+  // needs NO new grant — the previewed app opts in by subscribing (`onItemDrop`).
   'dnd:source': { kind: 'action', tier: 'first-party-only', since: '1.2.0', maximallyExplicit: true },
   // The §5.5 method catalog (the app's own filtered RPC surface) — baseline:
   // every app may discover what IT can call; the list is grant-filtered so it
@@ -212,8 +220,8 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   'secrets:list': { kind: 'read', tier: 'elevated', since: '1.1.0' },
   'secrets:revoke': { kind: 'action', tier: 'elevated', since: '1.1.0' },
   // R3-76 (P3-74, LLM_AND_AGENTS_SPEC §3.4/§4; LOCAL_DEV_AUTHED_SERVER_SPEC):
-  // open and drive a user-local Claude Code via the bridge — the in-browser host
-  // kernel connects OUT to the CLI's authenticated localhost server and runs each
+  // open and drive a user-local Claude Code via the bridge — the in-browser Host
+  // connects OUT to the CLI's authenticated localhost server and runs each
   // tool call through its §8.4-gated invoke(). Promoted from proposed/since:null
   // to a defined, gated, elevated capability landing in the current 1.2.0
   // registry — gated host-side by `protocol-agent` (site-main actionGate) and held
@@ -229,7 +237,10 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // diagnostics (no cross-app bleed — enforced host-side by the channel projection).
   'diagnostics:read': { kind: 'action', tier: 'elevated', since: '1.2.0', appScoped: true },
   // SERVICE_PROVIDERS_SPEC `llm.chat@1` / LLM_AND_AGENTS_SPEC D5: invoke the shared,
-  // provider-agnostic chat slot. The app calls ONE slot; the host resolves which
+  // provider-agnostic chat slot. ("provider" here = the Service-provider sense —
+  // an App that provides a Service, core_concepts §6 — and "slot" here = a Service
+  // interface, not the UI Slot of core_concepts §3; the names mirror the
+  // SERVICE_PROVIDERS surface and are kept.) The app calls ONE slot; the host resolves which
   // vendor answers from the key the user holds (`SecretView.boundOrigin`) + their
   // `preferredImplementation` choice, injects the key host-side (§6, look-at-nothing
   // proxy), and streams normalized deltas back. The app never names a vendor, never
@@ -244,7 +255,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  capabilities.json. (1.2.0 added the per-user settings-space capabilities.) */
 export const REGISTRY_VERSION = '1.3.0';
 
-/** Is `cap` a known kernel capability? (Closed vocabulary — §5.12.) */
+/** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
   return Object.prototype.hasOwnProperty.call(CAPABILITIES, cap);
 }

@@ -26,7 +26,15 @@ exports.grantKey = grantKey;
  *  use after expiry re-prompts. Baseline needs no grant record, so this never
  *  touches it. */
 exports.GRANT_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
-/** A principal that can be granted access to a space. */
+/** The member doc-ID for a user who can be granted access to a space:
+ *  `user:<uid>`. VOCAB NOTE (core_concepts §4 reserved-word): this is a **grantee**
+ *  (a space member — the `uid`/`gid` of `setSpaceRole`), NOT the authority-context
+ *  Principal. The name `userPrincipal` and the `memberPath(…, principal)` param
+ *  predate the §4 rename; renaming the TS symbols to `grantee` is the cross-repo
+ *  RENAME-1 track (see REFACTOR_CANDIDATES.md / 07-preauth-core.md Phase 2). The
+ *  stored Firestore path segment (`spaces/{id}/members/{user:<uid>}`) is a doc-ID,
+ *  not a field literally named `principal`, so the rename is code-symbol-only — no
+ *  data migration — and is deferred until coordinated with SDK + site-main + backend. */
 const userPrincipal = (uid) => `user:${uid}`;
 exports.userPrincipal = userPrincipal;
 /** Drop undefined values — Firestore rejects them. The two adapters historically
@@ -119,7 +127,7 @@ const appSpaceGrantFields = (params, s) => (0, exports.defined)({
     grantedAt: s.serverTimestamp(),
     lastUsedAt: s.serverTimestamp(),
     name: params.name,
-    // Plan 12 §8.7: `rules` is authoritative; `subtree`/`mode` are kept as the
+    // UI_AS_APPS_SPEC §8.7: `rules` is authoritative; `subtree`/`mode` are kept as the
     // deprecated `rules[0]` mirror for not-yet-migrated readers. When no rule-set
     // is given, derive a single-rule set from the legacy scope so the backend
     // single-scope mint path still emits `rules` (byte-identical with site-main).

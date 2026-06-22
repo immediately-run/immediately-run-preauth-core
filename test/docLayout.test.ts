@@ -74,7 +74,7 @@ describe('docLayout — field objects', () => {
   it('appSpaceGrantFields stamps the three timestamps + mintPath default + derived rules', () => {
     expect(appKeyTouchFields(sentinels)).toEqual({ touchedAt: TS });
     // No `rules` given → derive a single-rule set from the legacy subtree/mode
-    // (plan 12 §8.7), so the backend single-scope mint path still emits `rules`.
+    // (UI_AS_APPS_SPEC §8.7), so the backend single-scope mint path still emits `rules`.
     expect(appSpaceGrantFields({ mode: 'rw', declaredUri: 'cache' }, sentinels)).toEqual({
       boundAt: TS,
       grantedAt: TS,
