@@ -6,6 +6,12 @@
 // so a headless/CI/cron/`immediately-run dev` run finds the grant already present
 // and boots with NO prompt. It is not a region-repointing registry layer (§3.3):
 // it only writes the §8.6/§8.7 grant set the gate already reads, so M1 minting
+//
+// ("region-binding-only" below = the UI half of a Slot (core_concepts §3): the
+// Slot's principal confers such a capability as part of being bound, NOT via a
+// consent path (slot occupancy is not a capability, core_concepts §3/§5) — which
+// is exactly why a URL-loaded appKey, which CANNOT pick its slot, can never EARN a
+// broad-elevated cap, only the app-scoped consent-path caps below.)
 // flows through the ONE existing mint path (`mintConsentedGrants`, stamped
 // `mintPath:'policy'`) and cannot drift from M3.
 //

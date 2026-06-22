@@ -13,7 +13,10 @@ export interface CapabilityDef {
      *  elevated capability can be EARNED by a URL-loaded/previewed app via lazy
      *  first-use or manifest-`requests` consent and recorded as a per-`(user,
      *  appKey)` grant; non-app-scoped elevated caps are never earnable that way
-     *  (region binding only). The app-scoped set is `net:fetch`, `task:invoke`,
+     *  (region binding only). In core_concepts §5 terms the consent-path is the
+     *  "above-the-floor, up-to-the-ceiling → first-use consent" band: an app-scoped
+     *  elevated cap sits in that band for the stage principal, a non-app-scoped one
+     *  is above the stage ceiling (granted only by a slot's elevated principal). The app-scoped set is `net:fetch`, `task:invoke`,
      *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
      *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
      *  participates in the §8.15 90-day expiry like any app-scoped grant. */
@@ -22,8 +25,9 @@ export interface CapabilityDef {
      *  explicit** (scariest) styling, never bundled into a combined prompt
      *  (decision #2). The most dangerous writes carry it: `contribute:direct`
      *  (commit without review) and `editor:write` (mutate the working tree).
-     *  Independent of tier — it governs HOW the line is shown, not WHO may hold the
-     *  capability (a first-party-only cap is still refused to a fork regardless). */
+     *  Independent of tier — it governs HOW the first-use consent line (core_concepts
+     *  §5: the above-floor consent band) is shown, not WHO may hold the capability
+     *  (a first-party-only cap is still refused to a fork regardless of styling). */
     maximallyExplicit?: boolean;
 }
 export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
@@ -31,7 +35,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  provider-agnostic `llm:chat` capability (the `llm.chat@1` slot), mirroring
  *  capabilities.json. (1.2.0 added the per-user settings-space capabilities.) */
 export declare const REGISTRY_VERSION = "1.3.0";
-/** Is `cap` a known kernel capability? (Closed vocabulary — §5.12.) */
+/** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;
 /** Baseline = what the previewed app and any unconsented binding may hold. */

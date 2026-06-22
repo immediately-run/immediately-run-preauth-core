@@ -14,7 +14,7 @@
  *  mean whole-space, read-write. */
 export type GrantMode = 'ro' | 'rw';
 
-/** One granted scope within a mount (UI_AS_APPS_SPEC §8.7, plan 12): an absolute
+/** One granted scope within a mount (UI_AS_APPS_SPEC §8.7): an absolute
  *  `subtree` in the backing fs and the access `mode` there. A grant carries a SET
  *  of these (`rules`); the most specific (longest-prefix) rule governs a path. The
  *  wire shape, so both mint adapters write byte-identical `rules` arrays. */
@@ -64,7 +64,7 @@ export interface GrantSpaceParams {
   spaceId: string;
   subtree?: string;
   mode?: GrantMode;
-  /** Plan 12 §8.7: the FULL rule-set to write (≥1). When given it is authoritative
+  /** UI_AS_APPS_SPEC §8.7: the FULL rule-set to write (≥1). When given it is authoritative
    *  (site-main's read-modify-merge passes the merged set); when omitted the grant
    *  doc derives a single-rule `[{ subtree ?? '/', mode ?? 'rw' }]` from the legacy
    *  `subtree`/`mode` (the backend single-scope path), so both adapters emit `rules`. */
