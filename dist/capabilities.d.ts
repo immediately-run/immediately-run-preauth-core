@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'mounts:read' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'mounts:read' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -31,10 +31,11 @@ export interface CapabilityDef {
     maximallyExplicit?: boolean;
 }
 export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
-/** The current registry/vocabulary version (§5.11). Bumped to 1.3.0 with the
- *  provider-agnostic `llm:chat` capability (the `llm.chat@1` slot), mirroring
- *  capabilities.json. (1.2.0 added the per-user settings-space capabilities.) */
-export declare const REGISTRY_VERSION = "1.3.0";
+/** The current registry/vocabulary version (§5.11). Bumped to 1.4.0 with the
+ *  `authoring:run` capability (the kernel authoring services — CLIENT_SERVICES §6,
+ *  R3-107), mirroring capabilities.json. (1.3.0 added the provider-agnostic
+ *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.) */
+export declare const REGISTRY_VERSION = "1.4.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;

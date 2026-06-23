@@ -186,11 +186,19 @@ exports.CAPABILITIES = {
     // Elevated + app-scoped: a fork/previewed app EARNS it via lazy/manifest consent
     // (the fork-needs-more-caps story), recorded as a per-(user,appKey) §8.15 grant.
     'llm:chat': { kind: 'action', tier: 'elevated', since: '1.3.0', appScoped: true },
+    // Authoring services (CLIENT_SERVICES_SPEC §6, R3-107): typecheck/lint/format
+    // source via a kernel-owned same-origin worker (the in-browser coding agent's
+    // quality tools, LLM_AND_AGENTS §3.3). Baseline action — the worker only
+    // transforms data the app already holds and returns diagnostics, runs under host
+    // authority with nothing to confine (§3a), and is bounded per call (timeout +
+    // input-size). Not app-scoped: it confers no authority over other apps/mounts.
+    'authoring:run': { kind: 'action', tier: 'baseline', since: '1.4.0' },
 };
-/** The current registry/vocabulary version (§5.11). Bumped to 1.3.0 with the
- *  provider-agnostic `llm:chat` capability (the `llm.chat@1` slot), mirroring
- *  capabilities.json. (1.2.0 added the per-user settings-space capabilities.) */
-exports.REGISTRY_VERSION = '1.3.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.4.0 with the
+ *  `authoring:run` capability (the kernel authoring services — CLIENT_SERVICES §6,
+ *  R3-107), mirroring capabilities.json. (1.3.0 added the provider-agnostic
+ *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.) */
+exports.REGISTRY_VERSION = '1.4.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
