@@ -23,10 +23,6 @@ export declare const GRANT_EXPIRY_MS: number;
  *  RENAME-1). The stored Firestore path segment is a doc-ID, not a field literally
  *  named `principal`, so this rename is code-symbol-only — no data migration. */
 export declare const granteeId: (uid: string) => string;
-/** @deprecated use {@link granteeId}. Kept as an alias for the `userPrincipal →
- *  granteeId` migration (the SDK + site-main + backend RENAME-1 track); removed once
- *  consumers migrate. */
-export declare const userPrincipal: (uid: string) => string;
 /** Drop undefined values — Firestore rejects them. The two adapters historically
  *  each had their own copy of this; sharing it keeps the "omit absent optionals"
  *  rule identical on both sides. */
