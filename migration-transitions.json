@@ -1,0 +1,10 @@
+{
+  "transitions": [
+    {
+      "old": "userPrincipal",
+      "new": "granteeId",
+      "status": "cutover",
+      "note": "RENAME-1 (R3-124 / SPEC_CODE_DEBT §7.1). The deprecated userPrincipal alias is removed here; granteeId is canonical. No consumer imported userPrincipal (drained), so this cutover lands independently. See docs/context/cross_repo_migration.md."
+    }
+  ]
+}

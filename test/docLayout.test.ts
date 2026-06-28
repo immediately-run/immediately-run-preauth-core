@@ -14,6 +14,7 @@ import {
   appSpacePath,
   defined,
   GRANT_EXPIRY_MS,
+  granteeId,
   grantKey,
   memberPath,
   mergeNetFetchHosts,
@@ -24,7 +25,6 @@ import {
   spacePath,
   userCountFields,
   userCountPath,
-  userPrincipal,
   userSpacePath,
   type MintSentinels,
 } from '../src/docLayout';
@@ -38,7 +38,7 @@ const sentinels: MintSentinels = {
 describe('docLayout — paths', () => {
   it('lays out the documented collection/doc paths', () => {
     expect(spacePath('s1')).toEqual(['spaces', 's1']);
-    expect(memberPath('s1', userPrincipal('u1'))).toEqual(['spaces', 's1', 'members', 'user:u1']);
+    expect(memberPath('s1', granteeId('u1'))).toEqual(['spaces', 's1', 'members', 'user:u1']);
     expect(userSpacePath('u1', 's1')).toEqual(['user-spaces', 'u1', 'spaces', 's1']);
     expect(appKeyPath('u1', 'app')).toEqual(['user-app-spaces', 'u1', 'apps', 'app']);
     expect(appSpacePath('u1', 'app', 's1')).toEqual([

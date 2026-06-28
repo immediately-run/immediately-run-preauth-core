@@ -16,7 +16,7 @@
 // `.set()`/`.update()` is the only thing each adapter does itself. Drift is then
 // impossible without editing a helper both consume.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.userPrincipal = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
+exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -33,10 +33,6 @@ exports.GRANT_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
  *  named `principal`, so this rename is code-symbol-only — no data migration. */
 const granteeId = (uid) => `user:${uid}`;
 exports.granteeId = granteeId;
-/** @deprecated use {@link granteeId}. Kept as an alias for the `userPrincipal →
- *  granteeId` migration (the SDK + site-main + backend RENAME-1 track); removed once
- *  consumers migrate. */
-exports.userPrincipal = exports.granteeId;
 /** Drop undefined values — Firestore rejects them. The two adapters historically
  *  each had their own copy of this; sharing it keeps the "omit absent optionals"
  *  rule identical on both sides. */
