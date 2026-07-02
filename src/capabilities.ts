@@ -19,6 +19,7 @@ export type Capability =
   | 'route:read'
   | 'formFactor:read'
   | 'mounts:read'
+  | 'mounts:registry'
   | 'spaces:app'
   | 'spaces:user'
   | 'spaces:admin'
@@ -88,6 +89,20 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   'route:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'formFactor:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'mounts:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
+  // Enumerate the session's mounts BEYOND the app's own — the Session-lens
+  // "App | Session" superset (PRINCIPALS_SPEC §9 B2 / §8.9.1 / D-PRIN-4). Where
+  // `mounts:read` is a per-app filter (own mounts only, baseline), this is the
+  // cross-scope registry oracle: it reveals mounts the previewed app was never
+  // granted (the editor/agent session's own), so it is an activity oracle exactly
+  // like `settings:all`. **Permanently first-party-only:** a URL-loaded/previewed
+  // fork of the File Explorer may hold the App lens (`mounts:read`) but NEVER the
+  // Session lens — `buildConsent` refuses a first-party-only cap to a non-first-
+  // party binding regardless of consent, `overridePolicy` strips it on a repoint
+  // (D-PRIN-4 rejected both a forkable Session lens and a separate "session lens"
+  // capability: this IS the settled `mounts:registry`, a view selector over the
+  // mount registry, not a new power). Read kind — it gates the first-party
+  // `session-mounts` push channel (§8.3 view() projection).
+  'mounts:registry': { kind: 'read', tier: 'first-party-only', since: '1.5.0' },
   'spaces:app': { kind: 'action', tier: 'baseline', since: '1.0.0', parameterized: true },
   'spaces:user': { kind: 'action', tier: 'elevated', since: '1.0.0' },
   'spaces:admin': { kind: 'action', tier: 'elevated', since: '1.0.0' },
@@ -258,11 +273,12 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   'authoring:run': { kind: 'action', tier: 'baseline', since: '1.4.0' },
 };
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.4.0 with the
- *  `authoring:run` capability (the kernel authoring services — CLIENT_SERVICES §6,
- *  R3-107), mirroring capabilities.json. (1.3.0 added the provider-agnostic
- *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.) */
-export const REGISTRY_VERSION = '1.4.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.5.0 with the
+ *  first-party-only `mounts:registry` capability (the PRINCIPALS §9 B2 Session-lens
+ *  mount oracle — R3-95), mirroring capabilities.json. (1.4.0 added `authoring:run`;
+ *  1.3.0 added the provider-agnostic `llm:chat` slot; 1.2.0 added the per-user
+ *  settings-space capabilities.) */
+export const REGISTRY_VERSION = '1.5.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
