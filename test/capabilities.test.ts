@@ -2,12 +2,31 @@ import {
   CAPABILITIES,
   REGISTRY_VERSION,
   BASELINE_CAPABILITIES,
+  HOST_PARAMETERIZED_CAPABILITIES,
   isKnownCapability,
   isBaseline,
   isAppScoped,
+  isHostParameterized,
   tierOf,
   isSupportedCapability,
 } from '../src/capabilities';
+
+// R3-233 — the plain-vs-host-parameterized split that decides which grantable
+// app-scoped caps are minted as bare on/off grants vs via their host set.
+describe('host-parameterized capabilities (R3-233 plain-cap mint exclusion)', () => {
+  it('net:fetch is host-parameterized (granted via host set, never a bare cap)', () => {
+    expect(isHostParameterized('net:fetch')).toBe(true);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).toContain('net:fetch');
+  });
+  it('task:invoke / llm:chat / contribute:self are NOT host-parameterized (plain grants)', () => {
+    // These are app-scoped AND minted as bare on/off caps; task:invoke is
+    // `parameterized` but bounded by the manifest, not a durable grant param.
+    expect(isHostParameterized('task:invoke')).toBe(false);
+    expect(isHostParameterized('llm:chat')).toBe(false);
+    expect(isHostParameterized('contribute:self')).toBe(false);
+    expect(isAppScoped('llm:chat')).toBe(true);
+  });
+});
 
 // R3-95 (PRINCIPALS_SPEC §9 B2 / §8.9.1 / D-PRIN-4): the Session-lens mount oracle.
 // These assertions lock the security-critical classification — a regression here

@@ -310,6 +310,18 @@ export function isAppScoped(cap: Capability): boolean {
   return CAPABILITIES[cap].appScoped === true;
 }
 
+/** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
+ *  path — today only `net:fetch` (its granted host set, §5.11). These are granted
+ *  by that path, never as a bare on/off capability: a bare `net:fetch` grant would
+ *  be UNBOUNDED (every origin), so the plain-capability mint (R3-233) MUST exclude
+ *  them. `task:invoke` is `parameterized` too but its bound is the app's manifest
+ *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
+export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = ['net:fetch'];
+
+export function isHostParameterized(cap: Capability): boolean {
+  return HOST_PARAMETERIZED_CAPABILITIES.includes(cap);
+}
+
 // ── §5.11 capability version gate (threat T26) ──────────────────────────────
 //
 // Each capability declares the lowest registry version that knows it (`since`).

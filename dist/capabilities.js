@@ -9,11 +9,12 @@
 // with a view() projection on a channel (§8.3); actions are gated before the
 // handler (§8.4). Parameterized capabilities additionally bound an argument set.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.APP_SCOPED_CAPABILITIES = exports.BASELINE_CAPABILITIES = exports.REGISTRY_VERSION = exports.CAPABILITIES = void 0;
+exports.HOST_PARAMETERIZED_CAPABILITIES = exports.APP_SCOPED_CAPABILITIES = exports.BASELINE_CAPABILITIES = exports.REGISTRY_VERSION = exports.CAPABILITIES = void 0;
 exports.isKnownCapability = isKnownCapability;
 exports.tierOf = tierOf;
 exports.isBaseline = isBaseline;
 exports.isAppScoped = isAppScoped;
+exports.isHostParameterized = isHostParameterized;
 exports.compareVersions = compareVersions;
 exports.isSupportedCapability = isSupportedCapability;
 exports.unsupportedCapabilities = unsupportedCapabilities;
@@ -233,6 +234,16 @@ function isBaseline(cap) {
 exports.APP_SCOPED_CAPABILITIES = Object.keys(exports.CAPABILITIES).filter((c) => exports.CAPABILITIES[c].appScoped === true);
 function isAppScoped(cap) {
     return exports.CAPABILITIES[cap].appScoped === true;
+}
+/** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
+ *  path — today only `net:fetch` (its granted host set, §5.11). These are granted
+ *  by that path, never as a bare on/off capability: a bare `net:fetch` grant would
+ *  be UNBOUNDED (every origin), so the plain-capability mint (R3-233) MUST exclude
+ *  them. `task:invoke` is `parameterized` too but its bound is the app's manifest
+ *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
+exports.HOST_PARAMETERIZED_CAPABILITIES = ['net:fetch'];
+function isHostParameterized(cap) {
+    return exports.HOST_PARAMETERIZED_CAPABILITIES.includes(cap);
 }
 // ── §5.11 capability version gate (threat T26) ──────────────────────────────
 //

@@ -59,3 +59,13 @@ export declare const mergeNetFetchHosts: (existing: readonly NetFetchHost[], inc
  *  grant time is stamped ONCE, on first mint, and `netFetchLastUsedAt` refreshes
  *  on every (re-)consent). */
 export declare const netFetchGrantFields: (mergedHosts: readonly NetFetchHost[], hadGrantedAt: boolean, s: MintSentinels) => Record<string, unknown>;
+/** Union granted PLAIN app-scoped capability names (set semantics; sorted for a
+ *  stable, byte-faithful document) — the "consent accumulates" merge for the
+ *  R3-233 capability grant, mirroring {@link mergeNetFetchHosts}. */
+export declare const mergeCapabilities: (existing: readonly string[], incoming: readonly string[]) => string[];
+/** `user-app-spaces/{uid}/apps/{appKey}` — the durable granted PLAIN app-scoped
+ *  capability set (merge), R3-233. Lives on the SAME appKey doc as the net:fetch
+ *  grant so one read (`getAppGrantDoc`) yields both. `capabilitiesGrantedAt` is
+ *  stamped ONCE (first mint); `capabilitiesLastUsedAt` refreshes on every
+ *  (re-)consent — the §8.15 90-day-unused expiry clock, identical to net:fetch. */
+export declare const appCapabilitiesGrantFields: (mergedCaps: readonly string[], hadGrantedAt: boolean, s: MintSentinels) => Record<string, unknown>;

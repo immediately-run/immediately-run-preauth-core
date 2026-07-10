@@ -49,6 +49,14 @@ export declare function isBaseline(cap: Capability): boolean;
  *  per decision #1.) */
 export declare const APP_SCOPED_CAPABILITIES: readonly Capability[];
 export declare function isAppScoped(cap: Capability): boolean;
+/** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
+ *  path — today only `net:fetch` (its granted host set, §5.11). These are granted
+ *  by that path, never as a bare on/off capability: a bare `net:fetch` grant would
+ *  be UNBOUNDED (every origin), so the plain-capability mint (R3-233) MUST exclude
+ *  them. `task:invoke` is `parameterized` too but its bound is the app's manifest
+ *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
+export declare const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[];
+export declare function isHostParameterized(cap: Capability): boolean;
 /** Compare dotted numeric versions: <0 if a<b, 0 if equal, >0 if a>b. Missing
  *  segments are treated as 0 ("1.2" === "1.2.0"); non-numeric segments as 0. */
 export declare function compareVersions(a: string, b: string): number;

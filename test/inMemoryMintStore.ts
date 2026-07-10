@@ -5,12 +5,13 @@
 
 import type {
   CreateSpaceParams,
+  GrantAppCapabilitiesParams,
   GrantNetFetchParams,
   GrantSpaceParams,
   MintStore,
   NetFetchHost,
 } from '../src/port';
-import { grantKey, mergeNetFetchHosts } from '../src/docLayout';
+import { grantKey, mergeCapabilities, mergeNetFetchHosts } from '../src/docLayout';
 
 export interface MintedGrant {
   uid: string;
@@ -26,6 +27,7 @@ export class InMemoryMintStore implements MintStore {
   private seq = 0;
   private grants = new Map<string, MintedGrant>();
   private netFetch = new Map<string, NetFetchHost[]>();
+  private capabilities = new Map<string, string[]>();
 
   async createSpace(params: CreateSpaceParams): Promise<string> {
     this.calls.push({ method: 'createSpace', args: params });
@@ -50,6 +52,12 @@ export class InMemoryMintStore implements MintStore {
     this.netFetch.set(key, mergeNetFetchHosts(this.netFetch.get(key) ?? [], params.hosts));
   }
 
+  async grantAppCapabilities(params: GrantAppCapabilitiesParams): Promise<void> {
+    this.calls.push({ method: 'grantAppCapabilities', args: params });
+    const key = grantKey(params.appKey, params.uid);
+    this.capabilities.set(key, mergeCapabilities(this.capabilities.get(key) ?? [], params.capabilities));
+  }
+
   // --- read helpers (test assertions only) ---------------------------------
   listGrants(uid: string): MintedGrant[] {
     return [...this.grants.values()].filter((g) => g.uid === uid);
@@ -57,5 +65,9 @@ export class InMemoryMintStore implements MintStore {
 
   getNetFetchHosts(uid: string, appKey: string): NetFetchHost[] {
     return this.netFetch.get(grantKey(appKey, uid)) ?? [];
+  }
+
+  getAppCapabilities(uid: string, appKey: string): string[] {
+    return this.capabilities.get(grantKey(appKey, uid)) ?? [];
   }
 }

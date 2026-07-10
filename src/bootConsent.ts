@@ -31,6 +31,11 @@ export interface MintResult {
    *  requested) — the post-boot caller lifts the frame cap on this alone, even
    *  if a mount selection failed (matching its historical behavior). */
   netFetchOk: boolean;
+  /** Whether the plain app-scoped capability grant succeeded (vacuously true when
+   *  none was requested), R3-233. False when caps were requested but the store has
+   *  no `grantAppCapabilities` (fail-loud, never validate-then-drop) or the write
+   *  threw — the caller lifts those frame caps only on `true`. */
+  capabilitiesOk: boolean;
   /** Successfully minted per-selection space ids (for post-boot provisioning). */
   minted: { selection: ConsentSelection; spaceId: string }[];
 }
@@ -57,6 +62,12 @@ export async function mintConsentedGrants(
   netFetchHosts: readonly NetFetchHost[],
   mintPath: MintPath = 'interactive',
   onError?: MintErrorSink,
+  /** PLAIN app-scoped on/off capabilities to grant (R3-233) — `task:invoke`,
+   *  `llm:chat`, `contribute:self`, `diagnostics:read`. NOT `net:fetch` (host-
+   *  parameterized — granted via `netFetchHosts` above); the caller (`applyPreAuth`)
+   *  filters host-parameterized caps out. Defaults to none, so existing callers that
+   *  only mint mounts + hosts are unaffected. */
+  capabilities: readonly string[] = [],
 ): Promise<MintResult> {
   let ok = true;
   let netFetchOk = true;
@@ -67,6 +78,25 @@ export async function mintConsentedGrants(
       onError?.('net:fetch grant failed', err);
       ok = false;
       netFetchOk = false;
+    }
+  }
+  // Plain app-scoped capability grants (R3-233). Fail LOUD if asked to mint caps but
+  // the adapter has no `grantAppCapabilities` — a silent skip would resurrect the
+  // exact validate-then-drop bug this fixes.
+  let capabilitiesOk = true;
+  if (capabilities.length > 0) {
+    if (!store.grantAppCapabilities) {
+      onError?.('capability grant unsupported by this store', new Error('grantAppCapabilities not implemented'));
+      ok = false;
+      capabilitiesOk = false;
+    } else {
+      try {
+        await store.grantAppCapabilities({ uid, appKey, capabilities, mintPath });
+      } catch (err) {
+        onError?.('capability grant failed', err);
+        ok = false;
+        capabilitiesOk = false;
+      }
     }
   }
   const minted: MintResult['minted'] = [];
@@ -91,5 +121,5 @@ export async function mintConsentedGrants(
       ok = false;
     }
   }
-  return { ok, netFetchOk, minted };
+  return { ok, netFetchOk, capabilitiesOk, minted };
 }
