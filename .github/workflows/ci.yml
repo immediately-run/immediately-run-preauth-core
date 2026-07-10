@@ -22,8 +22,11 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false # never cache in release builds
-      # Trusted publishing requires npm >= 11.5.1
-      - run: npm install -g npm@latest
+      # Trusted publishing (OIDC + provenance) requires npm >= 11.5.1, which Node 24's
+      # BUNDLED npm already satisfies. We deliberately do NOT `npm install -g npm@latest`:
+      # that global reinstall was landing an INCOMPLETE npm whose `sigstore` module (a
+      # bundled provenance dep) was missing, so `npm publish` died with
+      # `Cannot find module 'sigstore'`. The Node-bundled npm is a complete install.
       - run: npm ci
       - run: npm run build
       - run: npm test
