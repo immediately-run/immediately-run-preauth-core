@@ -72,6 +72,7 @@ describe('applyPreAuth (M1 write path)', () => {
       grantNetFetchHosts: record('grantNetFetchHosts'),
       createSpace: record('createSpace', 'space-new'),
       grantSpaceToApp: record('grantSpaceToApp'),
+      grantAppCapabilities: record('grantAppCapabilities'),
     } as unknown as MintStore;
   };
   const create: ConsentSelection = { uri: 'cache', mode: 'ro', kind: 'create', name: 'New' };
@@ -103,5 +104,48 @@ describe('applyPreAuth (M1 write path)', () => {
     expect(res.mint).toBeUndefined();
     // The store was never touched — not even for the legitimately-grantable host.
     expect(calls).toEqual([]);
+  });
+
+  // R3-233: the plain app-scoped caps that used to be validated-then-DROPPED.
+  it('MINTS plain app-scoped caps (task:invoke, llm:chat) — no longer validated-and-dropped', async () => {
+    const store = fakeStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['task:invoke', 'llm:chat'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.mint?.capabilitiesOk).toBe(true);
+    const capCall = calls.find((c) => c.method === 'grantAppCapabilities');
+    expect(capCall).toBeDefined();
+    expect((capCall!.args as { capabilities: string[] }).capabilities.sort()).toEqual(['llm:chat', 'task:invoke']);
+    // Minted at POLICY provenance (the §8.11 audit shows "by policy").
+    expect((capCall!.args as { mintPath: string }).mintPath).toBe('policy');
+  });
+
+  it('EXCLUDES net:fetch from the plain-cap mint (host-parameterized → hosts only, never a bare grant)', async () => {
+    const store = fakeStore();
+    await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['net:fetch', 'llm:chat'],
+      mounts: [],
+      netFetchHosts: [host('https://api.example.com')],
+    });
+    // net:fetch is granted as its host set…
+    expect(calls.some((c) => c.method === 'grantNetFetchHosts')).toBe(true);
+    // …and NEVER as a bare on/off capability (that would be unbounded).
+    const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
+    const mintedCaps = (capCall.args as { capabilities: string[] }).capabilities;
+    expect(mintedCaps).toEqual(['llm:chat']);
+    expect(mintedCaps).not.toContain('net:fetch');
+  });
+
+  it('a clean pre-auth of ONLY net:fetch mints no plain caps (grantAppCapabilities untouched)', async () => {
+    const store = fakeStore();
+    await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['net:fetch'],
+      mounts: [],
+      netFetchHosts: [host('https://api.example.com')],
+    });
+    expect(calls.some((c) => c.method === 'grantAppCapabilities')).toBe(false);
   });
 });

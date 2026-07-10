@@ -31,7 +31,7 @@
 // Pure decision (`planPreAuthCapabilities`/`isPreAuthClean`) + a thin store-glue
 // write path (`applyPreAuth`) that reuses `mintConsentedGrants`. No React, no UI.
 
-import { isAppScoped, isBaseline, isKnownCapability, type Capability } from './capabilities';
+import { isAppScoped, isBaseline, isHostParameterized, isKnownCapability, type Capability } from './capabilities';
 import { mintConsentedGrants, type ConsentSelection, type MintErrorSink, type MintResult } from './bootConsent';
 import type { MintStore, NetFetchHost } from './port';
 
@@ -109,8 +109,17 @@ export interface PreAuthResult {
 
 /**
  * The M1 write path: validate the requested capabilities against the §8.9 target
- * check, then — only if clean — mint the mounts + net:fetch hosts as durable
- * grants with `policy` provenance, through the same `mintConsentedGrants` M3 uses.
+ * check, then — only if clean — mint the mounts, net:fetch hosts, AND the plain
+ * app-scoped on/off capabilities (`task:invoke`, `llm:chat`, `contribute:self`,
+ * `diagnostics:read`) as durable grants with `policy` provenance, through the same
+ * `mintConsentedGrants` M3 uses.
+ *
+ * R3-233: the `grantable` app-scoped caps used to be VALIDATED and then silently
+ * DROPPED (only mounts + hosts were minted), so pre-authorizing `task:invoke` /
+ * `llm:chat` reported success but granted nothing and the gate kept refusing. They
+ * are now actually minted. `net:fetch` is excluded from the plain-cap mint — it is
+ * host-parameterized and granted via `netFetchHosts` (a bare grant would be
+ * unbounded).
  *
  * Refusal is terminal and silent of side effects: when any requested capability
  * is broad-elevated or unknown, the function mints NOTHING and returns the
@@ -127,6 +136,9 @@ export async function applyPreAuth(
   if (!isPreAuthClean(plan)) {
     return { ok: false, refused: plan.refused };
   }
+  // The plain on/off caps to mint: every grantable cap EXCEPT the host-parameterized
+  // ones (net:fetch), which are minted as their host set via `netFetchHosts`.
+  const plainCaps = plan.grantable.filter((c) => !isHostParameterized(c));
   const mint = await mintConsentedGrants(
     store,
     uid,
@@ -135,6 +147,7 @@ export async function applyPreAuth(
     request.netFetchHosts,
     'policy',
     onError,
+    plainCaps,
   );
   return { ok: mint.ok, refused: [], mint };
 }

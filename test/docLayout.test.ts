@@ -12,11 +12,13 @@ import {
   appKeyTouchFields,
   appSpaceGrantFields,
   appSpacePath,
+  appCapabilitiesGrantFields,
   defined,
   GRANT_EXPIRY_MS,
   granteeId,
   grantKey,
   memberPath,
+  mergeCapabilities,
   mergeNetFetchHosts,
   netFetchGrantFields,
   ownerMemberFields,
@@ -121,6 +123,26 @@ describe('docLayout — field objects', () => {
       { origin: 'https://b.example', methods: ['POST'] },
       { origin: 'https://c.example' },
     ]);
+  });
+});
+
+describe('docLayout — plain capability grant (R3-233)', () => {
+  it('mergeCapabilities unions + sorts (set semantics; byte-stable)', () => {
+    expect(mergeCapabilities(['llm:chat'], ['task:invoke', 'llm:chat'])).toEqual(['llm:chat', 'task:invoke']);
+    expect(mergeCapabilities([], [])).toEqual([]);
+  });
+  it('appCapabilitiesGrantFields stamps grantedAt once, lastUsedAt always', () => {
+    // First mint (no prior grantedAt): both stamps present.
+    expect(appCapabilitiesGrantFields(['llm:chat', 'task:invoke'], false, sentinels)).toEqual({
+      grantedCapabilities: ['llm:chat', 'task:invoke'],
+      capabilitiesGrantedAt: TS,
+      capabilitiesLastUsedAt: TS,
+    });
+    // Re-consent (already had grantedAt): only lastUsedAt refreshes (grantedAt omitted).
+    expect(appCapabilitiesGrantFields(['llm:chat'], true, sentinels)).toEqual({
+      grantedCapabilities: ['llm:chat'],
+      capabilitiesLastUsedAt: TS,
+    });
   });
 });
 

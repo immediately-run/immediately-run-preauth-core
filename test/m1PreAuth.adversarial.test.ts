@@ -80,3 +80,50 @@ describe('M1 — a clean app-scoped pre-auth lands durable grants with policy pr
     expect(grants[0].declaredUri).toBe('cache');
   });
 });
+
+// R3-233 — the plain-capability mint. The property: a grantable app-scoped on/off
+// capability is DURABLY MINTED (not validated-then-dropped), net:fetch is never
+// minted as a bare cap, and a store that can't mint caps fails LOUD.
+describe('M1 — plain app-scoped capability grants (R3-233)', () => {
+  it('durably mints task:invoke + llm:chat for a URL-loaded appKey (policy provenance)', async () => {
+    const store = new InMemoryMintStore();
+    const res = await applyPreAuth(store, UID, APP_KEY, {
+      capabilities: ['task:invoke', 'llm:chat'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.mint?.capabilitiesOk).toBe(true);
+    expect(store.getAppCapabilities(UID, APP_KEY)).toEqual(['llm:chat', 'task:invoke']);
+    const call = store.calls.find((c) => c.method === 'grantAppCapabilities')!;
+    expect((call.args as { mintPath: string }).mintPath).toBe('policy');
+  });
+
+  it('never mints net:fetch as a BARE capability (unbounded-grant guard)', async () => {
+    const store = new InMemoryMintStore();
+    await applyPreAuth(store, UID, APP_KEY, {
+      capabilities: ['net:fetch', 'llm:chat'],
+      mounts: [],
+      netFetchHosts: [host('https://api.example.com')],
+    });
+    // net:fetch lives ONLY in the (bounded) host set; the bare-cap set holds llm:chat only.
+    expect(store.getAppCapabilities(UID, APP_KEY)).toEqual(['llm:chat']);
+    expect(store.getNetFetchHosts(UID, APP_KEY)).toEqual([host('https://api.example.com')]);
+  });
+
+  it('FAILS LOUD (never validate-then-drop) when the store cannot mint caps', async () => {
+    // A store WITHOUT grantAppCapabilities (e.g. an un-upgraded adapter). Asked to
+    // mint a plain cap, mintConsentedGrants must report failure, not silently drop —
+    // the exact bug R3-233 fixes.
+    const store = new InMemoryMintStore();
+    (store as { grantAppCapabilities?: unknown }).grantAppCapabilities = undefined;
+    const res = await applyPreAuth(store, UID, APP_KEY, {
+      capabilities: ['llm:chat'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(false);
+    expect(res.mint?.capabilitiesOk).toBe(false);
+    expect(store.getAppCapabilities(UID, APP_KEY)).toEqual([]); // nothing granted
+  });
+});

@@ -16,7 +16,7 @@
 // `.set()`/`.update()` is the only thing each adapter does itself. Drift is then
 // impossible without editing a helper both consume.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -158,3 +158,19 @@ const netFetchGrantFields = (mergedHosts, hadGrantedAt, s) => (0, exports.define
     netFetchLastUsedAt: s.serverTimestamp(),
 });
 exports.netFetchGrantFields = netFetchGrantFields;
+/** Union granted PLAIN app-scoped capability names (set semantics; sorted for a
+ *  stable, byte-faithful document) — the "consent accumulates" merge for the
+ *  R3-233 capability grant, mirroring {@link mergeNetFetchHosts}. */
+const mergeCapabilities = (existing, incoming) => [...new Set([...existing, ...incoming])].sort();
+exports.mergeCapabilities = mergeCapabilities;
+/** `user-app-spaces/{uid}/apps/{appKey}` — the durable granted PLAIN app-scoped
+ *  capability set (merge), R3-233. Lives on the SAME appKey doc as the net:fetch
+ *  grant so one read (`getAppGrantDoc`) yields both. `capabilitiesGrantedAt` is
+ *  stamped ONCE (first mint); `capabilitiesLastUsedAt` refreshes on every
+ *  (re-)consent — the §8.15 90-day-unused expiry clock, identical to net:fetch. */
+const appCapabilitiesGrantFields = (mergedCaps, hadGrantedAt, s) => (0, exports.defined)({
+    grantedCapabilities: [...mergedCaps],
+    capabilitiesGrantedAt: hadGrantedAt ? undefined : s.serverTimestamp(),
+    capabilitiesLastUsedAt: s.serverTimestamp(),
+});
+exports.appCapabilitiesGrantFields = appCapabilitiesGrantFields;

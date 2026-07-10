@@ -28,7 +28,13 @@ exports.mintConsentedGrants = mintConsentedGrants;
  * records which §11.4 declared mount it satisfies, so a later boot re-provisions
  * it without re-consent.
  */
-async function mintConsentedGrants(store, uid, appKey, selections, netFetchHosts, mintPath = 'interactive', onError) {
+async function mintConsentedGrants(store, uid, appKey, selections, netFetchHosts, mintPath = 'interactive', onError, 
+/** PLAIN app-scoped on/off capabilities to grant (R3-233) — `task:invoke`,
+ *  `llm:chat`, `contribute:self`, `diagnostics:read`. NOT `net:fetch` (host-
+ *  parameterized — granted via `netFetchHosts` above); the caller (`applyPreAuth`)
+ *  filters host-parameterized caps out. Defaults to none, so existing callers that
+ *  only mint mounts + hosts are unaffected. */
+capabilities = []) {
     let ok = true;
     let netFetchOk = true;
     if (netFetchHosts.length > 0) {
@@ -39,6 +45,27 @@ async function mintConsentedGrants(store, uid, appKey, selections, netFetchHosts
             onError?.('net:fetch grant failed', err);
             ok = false;
             netFetchOk = false;
+        }
+    }
+    // Plain app-scoped capability grants (R3-233). Fail LOUD if asked to mint caps but
+    // the adapter has no `grantAppCapabilities` — a silent skip would resurrect the
+    // exact validate-then-drop bug this fixes.
+    let capabilitiesOk = true;
+    if (capabilities.length > 0) {
+        if (!store.grantAppCapabilities) {
+            onError?.('capability grant unsupported by this store', new Error('grantAppCapabilities not implemented'));
+            ok = false;
+            capabilitiesOk = false;
+        }
+        else {
+            try {
+                await store.grantAppCapabilities({ uid, appKey, capabilities, mintPath });
+            }
+            catch (err) {
+                onError?.('capability grant failed', err);
+                ok = false;
+                capabilitiesOk = false;
+            }
         }
     }
     const minted = [];
@@ -63,5 +90,5 @@ async function mintConsentedGrants(store, uid, appKey, selections, netFetchHosts
             ok = false;
         }
     }
-    return { ok, netFetchOk, minted };
+    return { ok, netFetchOk, capabilitiesOk, minted };
 }

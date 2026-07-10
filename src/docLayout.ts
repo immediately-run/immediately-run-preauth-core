@@ -186,3 +186,27 @@ export const netFetchGrantFields = (
     netFetchGrantedAt: hadGrantedAt ? undefined : s.serverTimestamp(),
     netFetchLastUsedAt: s.serverTimestamp(),
   });
+
+/** Union granted PLAIN app-scoped capability names (set semantics; sorted for a
+ *  stable, byte-faithful document) — the "consent accumulates" merge for the
+ *  R3-233 capability grant, mirroring {@link mergeNetFetchHosts}. */
+export const mergeCapabilities = (
+  existing: readonly string[],
+  incoming: readonly string[],
+): string[] => [...new Set([...existing, ...incoming])].sort();
+
+/** `user-app-spaces/{uid}/apps/{appKey}` — the durable granted PLAIN app-scoped
+ *  capability set (merge), R3-233. Lives on the SAME appKey doc as the net:fetch
+ *  grant so one read (`getAppGrantDoc`) yields both. `capabilitiesGrantedAt` is
+ *  stamped ONCE (first mint); `capabilitiesLastUsedAt` refreshes on every
+ *  (re-)consent — the §8.15 90-day-unused expiry clock, identical to net:fetch. */
+export const appCapabilitiesGrantFields = (
+  mergedCaps: readonly string[],
+  hadGrantedAt: boolean,
+  s: MintSentinels,
+): Record<string, unknown> =>
+  defined({
+    grantedCapabilities: [...mergedCaps],
+    capabilitiesGrantedAt: hadGrantedAt ? undefined : s.serverTimestamp(),
+    capabilitiesLastUsedAt: s.serverTimestamp(),
+  });

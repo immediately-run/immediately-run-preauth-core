@@ -20,6 +20,11 @@ export interface MintResult {
      *  requested) — the post-boot caller lifts the frame cap on this alone, even
      *  if a mount selection failed (matching its historical behavior). */
     netFetchOk: boolean;
+    /** Whether the plain app-scoped capability grant succeeded (vacuously true when
+     *  none was requested), R3-233. False when caps were requested but the store has
+     *  no `grantAppCapabilities` (fail-loud, never validate-then-drop) or the write
+     *  threw — the caller lifts those frame caps only on `true`. */
+    capabilitiesOk: boolean;
     /** Successfully minted per-selection space ids (for post-boot provisioning). */
     minted: {
         selection: ConsentSelection;
@@ -39,4 +44,10 @@ export type MintErrorSink = (ctx: string, err: unknown) => void;
  * records which §11.4 declared mount it satisfies, so a later boot re-provisions
  * it without re-consent.
  */
-export declare function mintConsentedGrants(store: MintStore, uid: string, appKey: string, selections: readonly ConsentSelection[], netFetchHosts: readonly NetFetchHost[], mintPath?: MintPath, onError?: MintErrorSink): Promise<MintResult>;
+export declare function mintConsentedGrants(store: MintStore, uid: string, appKey: string, selections: readonly ConsentSelection[], netFetchHosts: readonly NetFetchHost[], mintPath?: MintPath, onError?: MintErrorSink, 
+/** PLAIN app-scoped on/off capabilities to grant (R3-233) — `task:invoke`,
+ *  `llm:chat`, `contribute:self`, `diagnostics:read`. NOT `net:fetch` (host-
+ *  parameterized — granted via `netFetchHosts` above); the caller (`applyPreAuth`)
+ *  filters host-parameterized caps out. Defaults to none, so existing callers that
+ *  only mint mounts + hosts are unaffected. */
+capabilities?: readonly string[]): Promise<MintResult>;

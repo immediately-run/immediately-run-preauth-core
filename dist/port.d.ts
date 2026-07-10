@@ -68,6 +68,19 @@ export interface GrantNetFetchParams {
     appKey: string;
     hosts: readonly NetFetchHost[];
 }
+/** Parameters for `MintStore.grantAppCapabilities` — the durable §8.7 grant of a
+ *  set of PLAIN (on/off) app-scoped elevated capabilities for one (user, app):
+ *  `task:invoke`, `llm:chat`, `contribute:self`, `diagnostics:read` (R3-233). NOT
+ *  `net:fetch` — that is host-parameterized and granted via {@link GrantNetFetchParams};
+ *  a bare `net:fetch` grant would be unbounded. The set unions into the app's
+ *  granted-capability set (consent accumulates), mirroring net:fetch hosts. */
+export interface GrantAppCapabilitiesParams {
+    uid: string;
+    appKey: string;
+    capabilities: readonly string[];
+    /** §8.15 provenance; defaults to `interactive` when omitted. */
+    mintPath?: MintPath;
+}
 /**
  * The mint port: exactly the methods `mintConsentedGrants` calls. Every backend
  * (browser Firestore, admin Firestore, the in-memory test double) implements
@@ -81,4 +94,11 @@ export interface MintStore {
     grantSpaceToApp(params: GrantSpaceParams): Promise<void>;
     /** Union the given net:fetch hosts into the app's consented host set. */
     grantNetFetchHosts(params: GrantNetFetchParams): Promise<void>;
+    /** Union the given PLAIN app-scoped capabilities into the app's granted set
+     *  (R3-233). **Optional** so existing {@link MintStore} implementers (the backend
+     *  `AdminMintStore`) keep compiling; when a caller asks to mint plain caps and an
+     *  adapter does not implement this, `mintConsentedGrants` fails LOUD (reports
+     *  `capabilitiesOk:false`) rather than silently dropping them — the exact
+     *  validate-then-drop bug R3-233 fixes. */
+    grantAppCapabilities?(params: GrantAppCapabilitiesParams): Promise<void>;
 }
