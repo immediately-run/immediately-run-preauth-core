@@ -60,6 +60,11 @@ export interface GrantSpaceParams {
     mintPath?: MintPath;
     /** §8.15 — parent `grantKey` for an M2 `delegated` grant. */
     parentGrantId?: string;
+    /** R3-98 S3/S4 — the **named principal** this grant is minted under (design 05a
+     *  §3.1). Written as the `principal` field so the mount-admission gate re-checks
+     *  it (a grant fires only under the principal it was minted with). Optional +
+     *  additive: omitted ⇒ no field ⇒ a legacy/grandfathered grant. */
+    principal?: string;
 }
 /** Parameters for `MintStore.grantNetFetchHosts` — the per-(user, app) granted
  *  host set, the grant half of the `manifest ∩ grant` net:fetch allowlist. */

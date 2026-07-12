@@ -17,6 +17,8 @@ import {
   GRANT_EXPIRY_MS,
   granteeId,
   grantKey,
+  grantKeyWithPrincipal,
+  parseGrantKey,
   memberPath,
   mergeCapabilities,
   mergeNetFetchHosts,
@@ -150,6 +152,41 @@ describe('docLayout — keys + constants', () => {
   it('grantKey joins appKey::spaceId', () => {
     expect(grantKey('github:acme/app', 's1')).toBe('github:acme/app::s1');
   });
+
+  // R3-98 S4 — the principal-aware grant key + arity-detecting parse (design 05a §3.1).
+  it('grantKeyWithPrincipal joins appKey::principal::spaceId', () => {
+    expect(grantKeyWithPrincipal('github__acme__app', 'editor.file-explorer', 's1')).toBe(
+      'github__acme__app::editor.file-explorer::s1',
+    );
+  });
+  it('parseGrantKey round-trips a 3-field (keyed) grant key', () => {
+    const k = grantKeyWithPrincipal('github__acme__app', 'editor.file-explorer', 's1');
+    expect(parseGrantKey(k)).toEqual({
+      appKey: 'github__acme__app',
+      principal: 'editor.file-explorer',
+      spaceId: 's1',
+    });
+  });
+  it('parseGrantKey round-trips a legacy 2-field grant key (principal undefined)', () => {
+    expect(parseGrantKey(grantKey('github__acme__app', 's1'))).toEqual({
+      appKey: 'github__acme__app',
+      spaceId: 's1',
+    });
+  });
+  it('parseGrantKey never mis-assigns a legacy spaceId to principal (MEDIUM-6 regression)', () => {
+    // A positional 3-way split of a 2-field key would put the spaceId in `principal`.
+    expect(parseGrantKey('github__acme__app::my-space-42').principal).toBeUndefined();
+    expect(parseGrantKey('github__acme__app::my-space-42').spaceId).toBe('my-space-42');
+  });
+  it('appSpaceGrantFields writes the principal field when given, omits it when absent', () => {
+    expect(appSpaceGrantFields({ mode: 'rw', principal: 'editor.commander' }, sentinels).principal).toBe(
+      'editor.commander',
+    );
+    expect(
+      Object.prototype.hasOwnProperty.call(appSpaceGrantFields({ mode: 'rw' }, sentinels), 'principal'),
+    ).toBe(false); // legacy mint ⇒ no field ⇒ grandfathered
+  });
+
   it('GRANT_EXPIRY_MS is 90 days', () => {
     expect(GRANT_EXPIRY_MS).toBe(90 * 24 * 60 * 60 * 1000);
   });
