@@ -73,6 +73,53 @@ export const parseGrantKey = (key: string): ParsedGrantKey => {
   return { appKey: parts[0], spaceId: parts[parts.length - 1] };
 };
 
+// --- R3-98 S5 — the principal-qualified space-grant doc-id (design 05a §3.1/§3.5) --
+//
+// A space grant's Firestore doc-id encodes the named principal it was minted
+// under, so two principals granting the SAME space live at DIFFERENT docs and are
+// invisible to each other (structural disjointness). The rule (design 05a §3.1
+// step 2): a **qualifying** (real, named) principal → `${principal}~${spaceId}`;
+// the **stage** principal, a **legacy** (no-principal) grant, or none → the bare
+// `spaceId`, so no existing/stage doc ever moves. This module is GRAMMAR ONLY: the
+// caller decides which principals qualify (site-main owns the stage/legacy
+// sentinels — a principal it treats as non-qualifying is passed as `undefined`).
+
+/** The doc-id delimiter between a qualifying principal and the spaceId. Safe: a
+ *  named principal is lowercase-dotted/hyphenated (CA-3 reserves `~`) and a
+ *  Firestore spaceId is alphanumeric, so `~` appears in NEITHER — a single,
+ *  unambiguous split point. */
+export const GRANT_DOCID_DELIM = '~';
+
+/** Build a space-grant doc-id (design 05a §3.1 step 2). Pass the QUALIFYING named
+ *  principal to get `${principal}~${spaceId}`; pass `undefined` (stage / legacy /
+ *  no principal) for the bare `spaceId`. The caller resolves "does this principal
+ *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
+ *  builder with no sentinel knowledge. */
+export const grantDocId = (spaceId: string, qualifyingPrincipal?: string): string =>
+  qualifyingPrincipal ? `${qualifyingPrincipal}${GRANT_DOCID_DELIM}${spaceId}` : spaceId;
+
+/** A parsed grant doc-id — the §3.5 reader-parse discipline. `principal` is set
+ *  only for a QUALIFIED (`${principal}~${spaceId}`) id; a bare id (a stage/legacy
+ *  grant) yields `{ spaceId }` with `principal` undefined. */
+export interface ParsedGrantDocId {
+  /** The qualifying principal, or undefined for a bare (stage/legacy) doc-id. */
+  principal?: string;
+  spaceId: string;
+}
+
+/** Parse a space-grant doc-id back into `{ principal?, spaceId }` — the §3.5
+ *  reader-parse discipline every app-space-grant collection reader routes `d.id`
+ *  through so it never mistakes `${principal}~${spaceId}` for a bare spaceId (which
+ *  would corrupt the derived `mountId` and leak grants across principals). Splits
+ *  on the FIRST delimiter; a named principal never contains `~`, so this recovers
+ *  the exact principal + spaceId. A bare id (no delimiter) ⇒ `{ spaceId }`. */
+export const parseGrantDocId = (docId: string): ParsedGrantDocId => {
+  const i = docId.indexOf(GRANT_DOCID_DELIM);
+  return i === -1
+    ? { spaceId: docId }
+    : { principal: docId.slice(0, i), spaceId: docId.slice(i + 1) };
+};
+
 /** Durable elevated/app-scoped grants expire after 90 days WITHOUT USE; first
  *  use after expiry re-prompts. Baseline needs no grant record, so this never
  *  touches it. */
@@ -112,13 +159,23 @@ export const appKeyPath = (uid: string, appKey: string): DocPath => [
   'apps',
   appKey,
 ];
-export const appSpacePath = (uid: string, appKey: string, spaceId: string): DocPath => [
+/** `user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` — the durable §8.7 grant
+ *  doc. R3-98 S5: the doc-id is principal-qualified — pass the QUALIFYING named
+ *  principal for `${principal}~${spaceId}`, or omit it (stage / legacy) for the
+ *  bare `spaceId`. Backward-compatible: a 3-arg call (no principal) yields exactly
+ *  the pre-S5 path, so the backend/CLI stage mint is byte-identical. */
+export const appSpacePath = (
+  uid: string,
+  appKey: string,
+  spaceId: string,
+  qualifyingPrincipal?: string,
+): DocPath => [
   'user-app-spaces',
   uid,
   'apps',
   appKey,
   'spaces',
-  spaceId,
+  grantDocId(spaceId, qualifyingPrincipal),
 ];
 export const userCountPath = (uid: string): DocPath => ['space-counts', uid];
 export const appCountPath = (uid: string, appKey: string): DocPath => [

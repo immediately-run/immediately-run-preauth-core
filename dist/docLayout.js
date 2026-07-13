@@ -16,7 +16,7 @@
 // `.set()`/`.update()` is the only thing each adapter does itself. Drift is then
 // impossible without editing a helper both consume.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -45,6 +45,41 @@ const parseGrantKey = (key) => {
     return { appKey: parts[0], spaceId: parts[parts.length - 1] };
 };
 exports.parseGrantKey = parseGrantKey;
+// --- R3-98 S5 — the principal-qualified space-grant doc-id (design 05a §3.1/§3.5) --
+//
+// A space grant's Firestore doc-id encodes the named principal it was minted
+// under, so two principals granting the SAME space live at DIFFERENT docs and are
+// invisible to each other (structural disjointness). The rule (design 05a §3.1
+// step 2): a **qualifying** (real, named) principal → `${principal}~${spaceId}`;
+// the **stage** principal, a **legacy** (no-principal) grant, or none → the bare
+// `spaceId`, so no existing/stage doc ever moves. This module is GRAMMAR ONLY: the
+// caller decides which principals qualify (site-main owns the stage/legacy
+// sentinels — a principal it treats as non-qualifying is passed as `undefined`).
+/** The doc-id delimiter between a qualifying principal and the spaceId. Safe: a
+ *  named principal is lowercase-dotted/hyphenated (CA-3 reserves `~`) and a
+ *  Firestore spaceId is alphanumeric, so `~` appears in NEITHER — a single,
+ *  unambiguous split point. */
+exports.GRANT_DOCID_DELIM = '~';
+/** Build a space-grant doc-id (design 05a §3.1 step 2). Pass the QUALIFYING named
+ *  principal to get `${principal}~${spaceId}`; pass `undefined` (stage / legacy /
+ *  no principal) for the bare `spaceId`. The caller resolves "does this principal
+ *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
+ *  builder with no sentinel knowledge. */
+const grantDocId = (spaceId, qualifyingPrincipal) => qualifyingPrincipal ? `${qualifyingPrincipal}${exports.GRANT_DOCID_DELIM}${spaceId}` : spaceId;
+exports.grantDocId = grantDocId;
+/** Parse a space-grant doc-id back into `{ principal?, spaceId }` — the §3.5
+ *  reader-parse discipline every app-space-grant collection reader routes `d.id`
+ *  through so it never mistakes `${principal}~${spaceId}` for a bare spaceId (which
+ *  would corrupt the derived `mountId` and leak grants across principals). Splits
+ *  on the FIRST delimiter; a named principal never contains `~`, so this recovers
+ *  the exact principal + spaceId. A bare id (no delimiter) ⇒ `{ spaceId }`. */
+const parseGrantDocId = (docId) => {
+    const i = docId.indexOf(exports.GRANT_DOCID_DELIM);
+    return i === -1
+        ? { spaceId: docId }
+        : { principal: docId.slice(0, i), spaceId: docId.slice(i + 1) };
+};
+exports.parseGrantDocId = parseGrantDocId;
 /** Durable elevated/app-scoped grants expire after 90 days WITHOUT USE; first
  *  use after expiry re-prompts. Baseline needs no grant record, so this never
  *  touches it. */
@@ -85,13 +120,18 @@ const appKeyPath = (uid, appKey) => [
     appKey,
 ];
 exports.appKeyPath = appKeyPath;
-const appSpacePath = (uid, appKey, spaceId) => [
+/** `user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` — the durable §8.7 grant
+ *  doc. R3-98 S5: the doc-id is principal-qualified — pass the QUALIFYING named
+ *  principal for `${principal}~${spaceId}`, or omit it (stage / legacy) for the
+ *  bare `spaceId`. Backward-compatible: a 3-arg call (no principal) yields exactly
+ *  the pre-S5 path, so the backend/CLI stage mint is byte-identical. */
+const appSpacePath = (uid, appKey, spaceId, qualifyingPrincipal) => [
     'user-app-spaces',
     uid,
     'apps',
     appKey,
     'spaces',
-    spaceId,
+    (0, exports.grantDocId)(spaceId, qualifyingPrincipal),
 ];
 exports.appSpacePath = appSpacePath;
 const userCountPath = (uid) => ['space-counts', uid];

@@ -37,6 +37,32 @@ export interface ParsedGrantKey {
  *  (first + last), so the cascade fails safe (child self-revokes) rather than
  *  crashing. */
 export declare const parseGrantKey: (key: string) => ParsedGrantKey;
+/** The doc-id delimiter between a qualifying principal and the spaceId. Safe: a
+ *  named principal is lowercase-dotted/hyphenated (CA-3 reserves `~`) and a
+ *  Firestore spaceId is alphanumeric, so `~` appears in NEITHER — a single,
+ *  unambiguous split point. */
+export declare const GRANT_DOCID_DELIM = "~";
+/** Build a space-grant doc-id (design 05a §3.1 step 2). Pass the QUALIFYING named
+ *  principal to get `${principal}~${spaceId}`; pass `undefined` (stage / legacy /
+ *  no principal) for the bare `spaceId`. The caller resolves "does this principal
+ *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
+ *  builder with no sentinel knowledge. */
+export declare const grantDocId: (spaceId: string, qualifyingPrincipal?: string) => string;
+/** A parsed grant doc-id — the §3.5 reader-parse discipline. `principal` is set
+ *  only for a QUALIFIED (`${principal}~${spaceId}`) id; a bare id (a stage/legacy
+ *  grant) yields `{ spaceId }` with `principal` undefined. */
+export interface ParsedGrantDocId {
+    /** The qualifying principal, or undefined for a bare (stage/legacy) doc-id. */
+    principal?: string;
+    spaceId: string;
+}
+/** Parse a space-grant doc-id back into `{ principal?, spaceId }` — the §3.5
+ *  reader-parse discipline every app-space-grant collection reader routes `d.id`
+ *  through so it never mistakes `${principal}~${spaceId}` for a bare spaceId (which
+ *  would corrupt the derived `mountId` and leak grants across principals). Splits
+ *  on the FIRST delimiter; a named principal never contains `~`, so this recovers
+ *  the exact principal + spaceId. A bare id (no delimiter) ⇒ `{ spaceId }`. */
+export declare const parseGrantDocId: (docId: string) => ParsedGrantDocId;
 /** Durable elevated/app-scoped grants expire after 90 days WITHOUT USE; first
  *  use after expiry re-prompts. Baseline needs no grant record, so this never
  *  touches it. */
@@ -55,7 +81,12 @@ export declare const spacePath: (spaceId: string) => DocPath;
 export declare const memberPath: (spaceId: string, grantee: string) => DocPath;
 export declare const userSpacePath: (uid: string, spaceId: string) => DocPath;
 export declare const appKeyPath: (uid: string, appKey: string) => DocPath;
-export declare const appSpacePath: (uid: string, appKey: string, spaceId: string) => DocPath;
+/** `user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` — the durable §8.7 grant
+ *  doc. R3-98 S5: the doc-id is principal-qualified — pass the QUALIFYING named
+ *  principal for `${principal}~${spaceId}`, or omit it (stage / legacy) for the
+ *  bare `spaceId`. Backward-compatible: a 3-arg call (no principal) yields exactly
+ *  the pre-S5 path, so the backend/CLI stage mint is byte-identical. */
+export declare const appSpacePath: (uid: string, appKey: string, spaceId: string, qualifyingPrincipal?: string) => DocPath;
 export declare const userCountPath: (uid: string) => DocPath;
 export declare const appCountPath: (uid: string, appKey: string) => DocPath;
 /** `spaces/{spaceId}` — the root doc (written WITHOUT merge). */
