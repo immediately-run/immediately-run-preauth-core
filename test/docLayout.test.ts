@@ -14,10 +14,13 @@ import {
   appSpacePath,
   appCapabilitiesGrantFields,
   defined,
+  GRANT_DOCID_DELIM,
   GRANT_EXPIRY_MS,
+  grantDocId,
   granteeId,
   grantKey,
   grantKeyWithPrincipal,
+  parseGrantDocId,
   parseGrantKey,
   memberPath,
   mergeCapabilities,
@@ -50,6 +53,52 @@ describe('docLayout — paths', () => {
     ]);
     expect(userCountPath('u1')).toEqual(['space-counts', 'u1']);
     expect(appCountPath('u1', 'app')).toEqual(['space-counts', 'u1', 'apps', 'app']);
+  });
+
+  // R3-98 S5 — the principal-qualified doc-id (design 05a §3.1 step 2).
+  it('appSpacePath qualifies the doc-id for a named principal, stays bare without one', () => {
+    // No principal (stage/legacy/backend) → byte-identical to the pre-S5 path.
+    expect(appSpacePath('u1', 'app', 's1')).toEqual([
+      'user-app-spaces', 'u1', 'apps', 'app', 'spaces', 's1',
+    ]);
+    // A qualifying named principal → `${principal}~${spaceId}` last segment.
+    expect(appSpacePath('u1', 'app', 's1', 'editor.file-explorer')).toEqual([
+      'user-app-spaces', 'u1', 'apps', 'app', 'spaces', 'editor.file-explorer~s1',
+    ]);
+  });
+});
+
+describe('docLayout — principal-qualified grant doc-id (R3-98 S5)', () => {
+  it('grantDocId qualifies iff a principal is given (grammar only)', () => {
+    expect(grantDocId('s1')).toBe('s1'); // stage/legacy → bare
+    expect(grantDocId('s1', undefined)).toBe('s1');
+    expect(grantDocId('s1', '')).toBe('s1'); // falsy ⇒ treated as un-qualified
+    expect(grantDocId('s1', 'editor.commander')).toBe('editor.commander~s1');
+    expect(GRANT_DOCID_DELIM).toBe('~');
+  });
+
+  it('parseGrantDocId round-trips a qualified doc-id', () => {
+    expect(parseGrantDocId('editor.file-explorer~7f3a')).toEqual({
+      principal: 'editor.file-explorer',
+      spaceId: '7f3a',
+    });
+    // grantDocId ∘ parseGrantDocId is the identity on a qualified id.
+    const id = grantDocId('7f3a', 'editor.file-explorer');
+    expect(grantDocId(parseGrantDocId(id).spaceId, parseGrantDocId(id).principal)).toBe(id);
+  });
+
+  it('parseGrantDocId leaves a bare (stage/legacy) doc-id un-parsed', () => {
+    expect(parseGrantDocId('7f3a')).toEqual({ spaceId: '7f3a' });
+    expect(parseGrantDocId('7f3a').principal).toBeUndefined();
+  });
+
+  it('parseGrantDocId splits on the FIRST delimiter (principal never contains ~)', () => {
+    // A named principal is dotted/hyphenated — no `~` — so the first split is the
+    // only split. (A spaceId is alphanumeric, so this is defensive.)
+    expect(parseGrantDocId('editor.spaces~abc123')).toEqual({
+      principal: 'editor.spaces',
+      spaceId: 'abc123',
+    });
   });
 });
 
