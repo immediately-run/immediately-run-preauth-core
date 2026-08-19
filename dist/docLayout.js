@@ -15,8 +15,18 @@
 // `FieldValue.serverTimestamp()`/`FieldValue.increment()`). The raw
 // `.set()`/`.update()` is the only thing each adapter does itself. Drift is then
 // impossible without editing a helper both consume.
+//
+// HONESTY NOTE (R3-285): that guarantee holds TODAY for the FIELD builders only.
+// The browser `FirestoreSpaceStore` builds its refs with the Web SDK's variadic
+// `doc(db, 'user-app-spaces', uid, 'apps', appKey, …)` and does NOT call the
+// `*Path` builders below — they are backend-only. The two constructions are
+// equivalent (`doc()` joins with `/` and re-parses exactly as the backend's
+// `segments.join('/')` does), but "one source for the paths" is an aspiration
+// here, not a fact, and a bug fixed in a `*Path` builder does not reach the
+// browser. What both sides DO share is `assertAppKeySegment` — the one property
+// a wrong path would violate. Unifying the ref construction is tracked debt.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -96,6 +106,64 @@ exports.granteeId = granteeId;
  *  rule identical on both sides. */
 const defined = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 exports.defined = defined;
+// --- the appKey grammar guard (R3-285) --------------------------------------
+//
+// An `appKey` is ONE Firestore path segment. The canonical grammar is
+// site-main's `spaceId.appKey()` — `enc(provider)__enc(namespace)__enc(repository)`
+// — which is punctuation-free by construction. The DANGER is the neighbouring
+// grammar: a *binding id* (`provider:namespace/repository`) is a different
+// identifier that also names a repo, and feeding one to the grant store is a
+// silent catastrophe rather than a loud one:
+//
+//   • one slash  (`github:acme/notes`)      → the joined path has an ODD segment
+//     count, so `doc()` throws `invalid-argument` — noisy, fails closed;
+//   • two slashes (`gitlab:g/sub/notes`, a nested namespace) → the path is EVEN
+//     and perfectly valid, so the grant is WRITTEN — to a document no reader
+//     looks at, that the §8.11 audit view does not enumerate, and that the
+//     §8.15 revoke cascade cannot reach. A durable, invisible, unrevokable grant.
+//
+// So the fix is NOT to encode: encoding would make the second case succeed
+// quietly at the wrong key. It is to refuse a key that is not one segment, at
+// the one place both adapters can share, and let the caller be corrected.
+//
+// This asserts the SEGMENT property (what Firestore requires), not the `__`
+// grammar (which lives in site-main and may still gain components) — the widest
+// check that still catches every wrong-grammar key we have seen.
+/** Thrown when an `appKey` is not a single Firestore path segment. Carries a
+ *  machine `code` so a caller can map it to its own error vocabulary. */
+class InvalidAppKeyError extends Error {
+    code = 'invalid-app-key';
+    constructor(appKey, why) {
+        super(`appKey ${JSON.stringify(appKey)} is not one Firestore path segment (${why}). ` +
+            'Expected the grant-store key grammar (`provider__namespace__repository`), ' +
+            'not a binding id (`provider:namespace/repository`).');
+        this.name = 'InvalidAppKeyError';
+    }
+}
+exports.InvalidAppKeyError = InvalidAppKeyError;
+/** Is `appKey` usable as exactly one Firestore path segment? Empty, `/`-bearing,
+ *  and the two relative-path doc-ids Firestore reserves are all refused. */
+const isAppKeySegment = (appKey) => typeof appKey === 'string' &&
+    appKey.length > 0 &&
+    !appKey.includes('/') &&
+    appKey !== '.' &&
+    appKey !== '..';
+exports.isAppKeySegment = isAppKeySegment;
+/** Refuse an `appKey` that is not one path segment — the shared chokepoint every
+ *  grant-store path builder runs first (R3-285). Returns the key so it can wrap a
+ *  segment in place. */
+const assertAppKeySegment = (appKey) => {
+    if (typeof appKey !== 'string' || appKey.length === 0) {
+        throw new InvalidAppKeyError(String(appKey), 'empty');
+    }
+    if (appKey.includes('/'))
+        throw new InvalidAppKeyError(appKey, 'contains "/"');
+    if (appKey === '.' || appKey === '..') {
+        throw new InvalidAppKeyError(appKey, 'is a reserved relative path');
+    }
+    return appKey;
+};
+exports.assertAppKeySegment = assertAppKeySegment;
 // --- document paths (pure, sentinel-free) -----------------------------------
 const spacePath = (spaceId) => ['spaces', spaceId];
 exports.spacePath = spacePath;
@@ -117,7 +185,7 @@ const appKeyPath = (uid, appKey) => [
     'user-app-spaces',
     uid,
     'apps',
-    appKey,
+    (0, exports.assertAppKeySegment)(appKey),
 ];
 exports.appKeyPath = appKeyPath;
 /** `user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` — the durable §8.7 grant
@@ -129,7 +197,7 @@ const appSpacePath = (uid, appKey, spaceId, qualifyingPrincipal) => [
     'user-app-spaces',
     uid,
     'apps',
-    appKey,
+    (0, exports.assertAppKeySegment)(appKey),
     'spaces',
     (0, exports.grantDocId)(spaceId, qualifyingPrincipal),
 ];
@@ -140,7 +208,7 @@ const appCountPath = (uid, appKey) => [
     'space-counts',
     uid,
     'apps',
-    appKey,
+    (0, exports.assertAppKeySegment)(appKey),
 ];
 exports.appCountPath = appCountPath;
 // --- field objects (inject the timestamp/increment sentinels) ---------------

@@ -13,6 +13,9 @@ import {
   appSpaceGrantFields,
   appSpacePath,
   appCapabilitiesGrantFields,
+  assertAppKeySegment,
+  InvalidAppKeyError,
+  isAppKeySegment,
   defined,
   GRANT_DOCID_DELIM,
   GRANT_EXPIRY_MS,
@@ -241,5 +244,67 @@ describe('docLayout — keys + constants', () => {
   });
   it('defined() drops only undefined (keeps null/0/empty-string)', () => {
     expect(defined({ a: 1, b: undefined, c: 0, d: '', e: null })).toEqual({ a: 1, c: 0, d: '', e: null });
+  });
+});
+
+// R3-285 — the appKey grammar guard. The bug this pins was NOT a missing encode:
+// the M2 delegation site handed the store a *binding id*
+// (`github:immediately-run/greeting-lib`) where the grant-store key
+// (`github__immediately-run__greeting-lib`) belongs. Encoding would have made the
+// wrong key succeed; refusing it makes the caller correct itself.
+describe('docLayout — the appKey must be one path segment (R3-285)', () => {
+  const GOOD = 'github__immediately-run__greeting-lib';
+
+  it('accepts the canonical grant-store key grammar', () => {
+    expect(isAppKeySegment(GOOD)).toBe(true);
+    expect(assertAppKeySegment(GOOD)).toBe(GOOD);
+    // A named program (AA-01) appends a 4th `__` component — still one segment.
+    expect(isAppKeySegment(`${GOOD}__viewer`)).toBe(true);
+    // `:` alone is legal in a Firestore segment; only `/` splits.
+    expect(isAppKeySegment('github%3Aacme__notes')).toBe(true);
+  });
+
+  // The reported failure: one slash ⇒ odd segment count ⇒ Firestore refuses.
+  it('refuses a binding id — the one-slash case that was REPORTED (fails closed)', () => {
+    expect(() => appKeyPath('u1', 'github:immediately-run/greeting-lib')).toThrow(
+      InvalidAppKeyError,
+    );
+    expect(() => appSpacePath('u1', 'github:immediately-run/greeting-lib', 's1')).toThrow(
+      InvalidAppKeyError,
+    );
+    expect(() => appCountPath('u1', 'github:immediately-run/greeting-lib')).toThrow(
+      InvalidAppKeyError,
+    );
+  });
+
+  // The case that MATTERS: a nested namespace (GitLab subgroups are ordinary
+  // binding ids) yields an EVEN, perfectly valid path — Firestore accepts it and
+  // writes a durable grant no reader, audit view or revoke cascade can reach.
+  // Without this guard the bug is silent, not loud.
+  it('refuses a NESTED-namespace binding id — the two-slash case that would fail OPEN', () => {
+    const nested = 'gitlab:group/subgroup/notes';
+    expect(isAppKeySegment(nested)).toBe(false);
+    expect(() => appKeyPath('u1', nested)).toThrow(InvalidAppKeyError);
+    // …and the path it WOULD have produced is even (6) — i.e. Firestore-legal.
+    expect(['user-app-spaces', 'u1', 'apps', nested].join('/').split('/')).toHaveLength(6);
+  });
+
+  it('refuses the empty key and the reserved relative doc-ids', () => {
+    for (const bad of ['', '.', '..']) {
+      expect(isAppKeySegment(bad)).toBe(false);
+      expect(() => appKeyPath('u1', bad)).toThrow(InvalidAppKeyError);
+    }
+  });
+
+  it('carries a machine code the caller can map to its own error vocabulary', () => {
+    try {
+      appKeyPath('u1', 'github:acme/notes');
+      throw new Error('expected a throw');
+    } catch (e) {
+      expect((e as InvalidAppKeyError).code).toBe('invalid-app-key');
+      // The message names BOTH grammars — the whole failure was confusing them.
+      expect((e as Error).message).toContain('provider__namespace__repository');
+      expect((e as Error).message).toContain('provider:namespace/repository');
+    }
   });
 });
