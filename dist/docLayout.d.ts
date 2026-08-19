@@ -77,6 +77,19 @@ export declare const granteeId: (uid: string) => string;
  *  each had their own copy of this; sharing it keeps the "omit absent optionals"
  *  rule identical on both sides. */
 export declare const defined: <T extends Record<string, unknown>>(obj: T) => T;
+/** Thrown when an `appKey` is not a single Firestore path segment. Carries a
+ *  machine `code` so a caller can map it to its own error vocabulary. */
+export declare class InvalidAppKeyError extends Error {
+    readonly code = "invalid-app-key";
+    constructor(appKey: string, why: string);
+}
+/** Is `appKey` usable as exactly one Firestore path segment? Empty, `/`-bearing,
+ *  and the two relative-path doc-ids Firestore reserves are all refused. */
+export declare const isAppKeySegment: (appKey: string) => boolean;
+/** Refuse an `appKey` that is not one path segment — the shared chokepoint every
+ *  grant-store path builder runs first (R3-285). Returns the key so it can wrap a
+ *  segment in place. */
+export declare const assertAppKeySegment: (appKey: string) => string;
 export declare const spacePath: (spaceId: string) => DocPath;
 export declare const memberPath: (spaceId: string, grantee: string) => DocPath;
 export declare const userSpacePath: (uid: string, spaceId: string) => DocPath;
