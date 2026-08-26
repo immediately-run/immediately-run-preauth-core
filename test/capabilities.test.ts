@@ -58,10 +58,57 @@ describe('mounts:registry — the first-party-only Session-lens oracle', () => {
   });
 
   it('is gated behind registry version 1.5.0 (§5.11 version gate)', () => {
-    expect(REGISTRY_VERSION).toBe('1.5.0');
+    // The gate's property is the capability's OWN `since`, not the current registry
+    // version — those were the same number only until the next capability landed, and
+    // pinning the current version here made every later addition fail a test about
+    // `mounts:registry`. (R3-350 was the first to hit it.)
     expect(CAPABILITIES['mounts:registry'].since).toBe('1.5.0');
     // A host too old to know it must refuse rather than half-enforce.
     expect(isSupportedCapability('mounts:registry', '1.4.0')).toBe(false);
     expect(isSupportedCapability('mounts:registry', '1.5.0')).toBe(true);
+    // …and the registry has not gone BACKWARDS past it.
+    expect(isSupportedCapability('mounts:registry', REGISTRY_VERSION)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('analytics:emit — the app-analytics capability (APP_ANALYTICS_SPEC §2)', () => {
+  it('is ELEVATED, not baseline — the distinction the earlier draft got wrong', () => {
+    // "baseline, consented" is not a tier and not a thing. `baseline` IS the floor:
+    // `buildConsent` short-circuits `tier === 'baseline'` before generating any consent
+    // line, and a previewed frame is seeded with the baseline set directly. At baseline
+    // this would hand every app on the platform an unconsented, unrevocable,
+    // un-journalled egress capability.
+    expect(tierOf('analytics:emit')).toBe('elevated');
+    expect(isBaseline('analytics:emit')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('analytics:emit');
+  });
+
+  it('is app-scoped — a consent-path annotation on the elevated tier, not a fourth tier', () => {
+    expect(isAppScoped('analytics:emit')).toBe(true);
+    // It joins the consentable set alongside the other app-earnable elevated caps.
+    expect(isAppScoped('net:fetch')).toBe(true);
+    expect(isAppScoped('llm:chat')).toBe(true);
+  });
+
+  it('is PARAMETERIZED, because the grant is not "may emit" but "may emit THIS vocabulary"', () => {
+    // §2.1: the manifest-declared vocabulary is hashed into the grant and a changed
+    // hash invalidates it. `appKey` carries no ref, so without that binding a publisher
+    // could observe their aggregates and then ship an alphabet tuned to encode what
+    // they now want to read, under a grant given for a different one.
+    expect(CAPABILITIES['analytics:emit'].parameterized).toBe(true);
+  });
+
+  it('is gated behind registry version 1.6.0', () => {
+    expect(CAPABILITIES['analytics:emit'].since).toBe('1.6.0');
+    expect(isSupportedCapability('analytics:emit', '1.5.0')).toBe(false);
+    expect(isSupportedCapability('analytics:emit', '1.6.0')).toBe(true);
+    expect(REGISTRY_VERSION).toBe('1.6.0');
+  });
+
+  it('is an ACTION — it writes, and there is no read counterpart at any tier', () => {
+    // T-AN-6: the SDK surface is write-only. No `analytics:read` exists to be granted.
+    expect(CAPABILITIES['analytics:emit'].kind).toBe('action');
+    expect(Object.keys(CAPABILITIES).filter((c) => c.startsWith('analytics:'))).toEqual(['analytics:emit']);
   });
 });
