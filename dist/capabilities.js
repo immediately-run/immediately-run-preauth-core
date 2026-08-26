@@ -208,13 +208,31 @@ exports.CAPABILITIES = {
     // authority with nothing to confine (§3a), and is bounded per call (timeout +
     // input-size). Not app-scoped: it confers no authority over other apps/mounts.
     'authoring:run': { kind: 'action', tier: 'baseline', since: '1.4.0' },
+    // APP_ANALYTICS_SPEC §2 (R3-350): emit an app's OWN usage analytics through the
+    // platform's pipeline, against a vocabulary the app declares in its manifest.
+    //
+    // **ELEVATED + appScoped, and NOT baseline.** The earlier spec draft wrote
+    // "baseline, consented", which is not a tier and not a thing: `baseline` IS the
+    // floor — `buildConsent` short-circuits `tier === 'baseline'` before generating any
+    // consent line, and a previewed frame is seeded with the baseline set directly. At
+    // baseline this would hand EVERY app on the platform an unconsented, unrevocable,
+    // un-journalled egress capability. CAPABILITY_REFERENCE had already closed the
+    // question: "'App-scoped' is NOT a fourth tier. It is a consent-path annotation on
+    // the elevated tier."
+    //
+    // **Parameterized**, because the grant is not "may emit" but "may emit THIS
+    // vocabulary": §2.1 hashes the manifest-declared vocabulary into the grant, and a
+    // changed hash invalidates it. `appKey` carries no ref, so without that binding a
+    // publisher could observe their aggregates and then ship an alphabet tuned to encode
+    // what they now want to read, under a grant the user gave for a different one.
+    'analytics:emit': { kind: 'action', tier: 'elevated', since: '1.6.0', parameterized: true, appScoped: true },
 };
-/** The current registry/vocabulary version (§5.11). Bumped to 1.5.0 with the
- *  first-party-only `mounts:registry` capability (the PRINCIPALS §9 B2 Session-lens
- *  mount oracle — R3-95), mirroring capabilities.json. (1.4.0 added `authoring:run`;
- *  1.3.0 added the provider-agnostic `llm:chat` slot; 1.2.0 added the per-user
- *  settings-space capabilities.) */
-exports.REGISTRY_VERSION = '1.5.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.6.0 with the
+ *  elevated, app-scoped, parameterized `analytics:emit` (APP_ANALYTICS_SPEC §2 —
+ *  R3-350), mirroring capabilities.json. (1.5.0 added the first-party-only
+ *  `mounts:registry`; 1.4.0 added `authoring:run`; 1.3.0 added the provider-agnostic
+ *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.) */
+exports.REGISTRY_VERSION = '1.6.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
