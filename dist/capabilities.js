@@ -226,13 +226,30 @@ exports.CAPABILITIES = {
     // publisher could observe their aggregates and then ship an alphabet tuned to encode
     // what they now want to read, under a grant the user gave for a different one.
     'analytics:emit': { kind: 'action', tier: 'elevated', since: '1.6.0', parameterized: true, appScoped: true },
+    // PRESENT_MODE_CHROME_SPEC §6 (R-PMC-17, R3-191): read the host's own present-mode
+    // chrome state — whether the platform menu/sheet is open over the app, and which
+    // edge the reveal tab sits on — so a platform-aware app MAY pause an animation
+    // while it is dimmed, or keep its corner clear of the tab.
+    //
+    // **BASELINE, alongside `formFactor:read`.** Both are reads of the HOST's own UI
+    // state, not of anything app-foreign: the app already knows it is being displayed,
+    // and "chrome is currently over you" discloses nothing about the user, other apps,
+    // the filesystem, or the network. There is no `chrome:set` counterpart — an app
+    // cannot operate platform chrome, only observe it, so this cannot become an
+    // authority-escalation path.
+    //
+    // R-PMC-18 is the reason it can be baseline without a consent line at all: no
+    // platform behavior may depend on an app consuming this channel, so an app that
+    // never reads it is indistinguishable from one that does.
+    'chrome:read': { kind: 'read', tier: 'baseline', since: '1.7.0' },
 };
-/** The current registry/vocabulary version (§5.11). Bumped to 1.6.0 with the
- *  elevated, app-scoped, parameterized `analytics:emit` (APP_ANALYTICS_SPEC §2 —
- *  R3-350), mirroring capabilities.json. (1.5.0 added the first-party-only
- *  `mounts:registry`; 1.4.0 added `authoring:run`; 1.3.0 added the provider-agnostic
- *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.) */
-exports.REGISTRY_VERSION = '1.6.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.7.0 with the baseline
+ *  state read `chrome:read` (PRESENT_MODE_CHROME_SPEC §6 — R3-191), mirroring
+ *  capabilities.json. (1.6.0 added the elevated, app-scoped, parameterized
+ *  `analytics:emit`; 1.5.0 added the first-party-only `mounts:registry`; 1.4.0 added
+ *  `authoring:run`; 1.3.0 added the provider-agnostic `llm:chat` slot; 1.2.0 added the
+ *  per-user settings-space capabilities.) */
+exports.REGISTRY_VERSION = '1.7.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
