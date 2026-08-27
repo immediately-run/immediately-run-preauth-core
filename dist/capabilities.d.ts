@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -31,13 +31,21 @@ export interface CapabilityDef {
     maximallyExplicit?: boolean;
 }
 export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
-/** The current registry/vocabulary version (§5.11). Bumped to 1.7.0 with the baseline
- *  state read `chrome:read` (PRESENT_MODE_CHROME_SPEC §6 — R3-191), mirroring
- *  capabilities.json. (1.6.0 added the elevated, app-scoped, parameterized
- *  `analytics:emit`; 1.5.0 added the first-party-only `mounts:registry`; 1.4.0 added
- *  `authoring:run`; 1.3.0 added the provider-agnostic `llm:chat` slot; 1.2.0 added the
- *  per-user settings-space capabilities.) */
-export declare const REGISTRY_VERSION = "1.7.0";
+/** The current registry/vocabulary version (§5.11). Bumped to 1.8.0 with the elevated,
+ *  app-scoped, host-parameterized `feed:fetch` (`CONNECTOR_EGRESS_FIXING_SPEC` §2 —
+ *  R3-227), mirroring capabilities.json. (1.7.0 added the baseline state read
+ *  `chrome:read`; 1.6.0 added `analytics:emit`; 1.5.0 added the first-party-only
+ *  `mounts:registry`; 1.4.0 added `authoring:run`; 1.3.0 added the provider-agnostic
+ *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.)
+ *
+ *  `feed:fetch` takes its OWN version rather than joining 1.7.0, even though both land
+ *  close together: 1.7.0 is already published (0.1.12, with `chrome:read`), so reusing it
+ *  would mean two different published vocabularies both answering "1.7.0" — and a
+ *  registry version that does not identify a vocabulary is not much of a version gate.
+ *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
+ *  rather than mounting half-working, which is the right outcome: a host that cannot
+ *  enforce target-fixing must not run a connector that assumes it. */
+export declare const REGISTRY_VERSION = "1.8.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;
@@ -51,11 +59,14 @@ export declare function isBaseline(cap: Capability): boolean;
 export declare const APP_SCOPED_CAPABILITIES: readonly Capability[];
 export declare function isAppScoped(cap: Capability): boolean;
 /** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
- *  path — today only `net:fetch` (its granted host set, §5.11). These are granted
- *  by that path, never as a bare on/off capability: a bare `net:fetch` grant would
- *  be UNBOUNDED (every origin), so the plain-capability mint (R3-233) MUST exclude
- *  them. `task:invoke` is `parameterized` too but its bound is the app's manifest
- *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
+ *  path: `net:fetch` (its granted host set, §5.11) and `feed:fetch` (its compiled
+ *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2). These are granted by that
+ *  path, never as a bare on/off capability: a bare `net:fetch` grant would be
+ *  UNBOUNDED (every origin), and a bare `feed:fetch` grant would be unbounded the
+ *  same way (no template, hence no fixed target), so the plain-capability mint
+ *  (R3-233) MUST exclude them. `task:invoke` is `parameterized` too but its bound is
+ *  the app's manifest `invokes` (§5.8), not a durable grant param, so it IS a plain
+ *  on/off grant. */
 export declare const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[];
 export declare function isHostParameterized(cap: Capability): boolean;
 /** Compare dotted numeric versions: <0 if a<b, 0 if equal, >0 if a>b. Missing
