@@ -44,6 +44,7 @@ export type Capability =
   | 'ipc'
   | 'task:invoke'
   | 'net:fetch'
+  | 'feed:fetch'
   | 'secrets:add'
   | 'secrets:list'
   | 'secrets:revoke'
@@ -228,6 +229,24 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // by the app's manifest `invokes` declaration (§5.8), enforced in the handler.
   'task:invoke': { kind: 'action', tier: 'elevated', since: '1.0.0', parameterized: true, appScoped: true },
   'net:fetch': { kind: 'action', tier: 'elevated', since: '1.0.0', parameterized: true, appScoped: true },
+  // Fire a host-constructed request TEMPLATE derived from trusted feed config
+  // (`CONNECTOR_EGRESS_FIXING_SPEC` §2, D2). Deliberately a DISTINCT capability from
+  // `net:fetch` rather than a narrower grant of it, because the two differ in what the
+  // app supplies, not in how much: `net:fetch` takes a URL and checks it against an
+  // allowlist, so within the allowed host set the app still picks the host, the path and
+  // the body on every call. `feed:fetch` takes a feed-instance id and a typed param
+  // object — there is no URL surface at all, so a connector steered by the bytes it
+  // fetched (the metacircular-interpreter threat, `REPORTING_SPREADSHEET §3.2` RB-1) has
+  // nothing to steer WITH.
+  //
+  // Holding both would erase that: a realm granted `feed:fetch` must NOT be granted
+  // `net:fetch`, which is a property of what the connector's manifest declares, and is
+  // why this is its own row rather than a flag on that one.
+  //
+  // Parameterized and host-parameterized: its durable authority IS the compiled template
+  // set (origin + path + method + typed slots), so a bare on/off grant would be unbounded
+  // in exactly the way a bare `net:fetch` grant would.
+  'feed:fetch': { kind: 'action', tier: 'elevated', since: '1.8.0', parameterized: true, appScoped: true },
   // Host-owned secret store (SECRETS_SPEC §4). All elevated; the value is never
   // readable by any app (`secrets:list` exposes metadata only). `secrets:add`
   // opens a host-drawn modal; `secrets:revoke` deletes + cascades use-grants. The
@@ -309,13 +328,21 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   'chrome:read': { kind: 'read', tier: 'baseline', since: '1.7.0' },
 };
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.7.0 with the baseline
- *  state read `chrome:read` (PRESENT_MODE_CHROME_SPEC §6 — R3-191), mirroring
- *  capabilities.json. (1.6.0 added the elevated, app-scoped, parameterized
- *  `analytics:emit`; 1.5.0 added the first-party-only `mounts:registry`; 1.4.0 added
- *  `authoring:run`; 1.3.0 added the provider-agnostic `llm:chat` slot; 1.2.0 added the
- *  per-user settings-space capabilities.) */
-export const REGISTRY_VERSION = '1.7.0';
+/** The current registry/vocabulary version (§5.11). Bumped to 1.8.0 with the elevated,
+ *  app-scoped, host-parameterized `feed:fetch` (`CONNECTOR_EGRESS_FIXING_SPEC` §2 —
+ *  R3-227), mirroring capabilities.json. (1.7.0 added the baseline state read
+ *  `chrome:read`; 1.6.0 added `analytics:emit`; 1.5.0 added the first-party-only
+ *  `mounts:registry`; 1.4.0 added `authoring:run`; 1.3.0 added the provider-agnostic
+ *  `llm:chat` slot; 1.2.0 added the per-user settings-space capabilities.)
+ *
+ *  `feed:fetch` takes its OWN version rather than joining 1.7.0, even though both land
+ *  close together: 1.7.0 is already published (0.1.12, with `chrome:read`), so reusing it
+ *  would mean two different published vocabularies both answering "1.7.0" — and a
+ *  registry version that does not identify a vocabulary is not much of a version gate.
+ *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
+ *  rather than mounting half-working, which is the right outcome: a host that cannot
+ *  enforce target-fixing must not run a connector that assumes it. */
+export const REGISTRY_VERSION = '1.8.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
@@ -348,12 +375,15 @@ export function isAppScoped(cap: Capability): boolean {
 }
 
 /** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
- *  path — today only `net:fetch` (its granted host set, §5.11). These are granted
- *  by that path, never as a bare on/off capability: a bare `net:fetch` grant would
- *  be UNBOUNDED (every origin), so the plain-capability mint (R3-233) MUST exclude
- *  them. `task:invoke` is `parameterized` too but its bound is the app's manifest
- *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
-export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = ['net:fetch'];
+ *  path: `net:fetch` (its granted host set, §5.11) and `feed:fetch` (its compiled
+ *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2). These are granted by that
+ *  path, never as a bare on/off capability: a bare `net:fetch` grant would be
+ *  UNBOUNDED (every origin), and a bare `feed:fetch` grant would be unbounded the
+ *  same way (no template, hence no fixed target), so the plain-capability mint
+ *  (R3-233) MUST exclude them. `task:invoke` is `parameterized` too but its bound is
+ *  the app's manifest `invokes` (§5.8), not a durable grant param, so it IS a plain
+ *  on/off grant. */
+export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = ['net:fetch', 'feed:fetch'];
 
 export function isHostParameterized(cap: Capability): boolean {
   return HOST_PARAMETERIZED_CAPABILITIES.includes(cap);

@@ -9,6 +9,7 @@ import {
   isHostParameterized,
   tierOf,
   isSupportedCapability,
+  unsupportedCapabilities,
 } from '../src/capabilities';
 
 // R3-233 — the plain-vs-host-parameterized split that decides which grantable
@@ -145,5 +146,57 @@ describe('chrome:read — the present-mode chrome state read (PRESENT_MODE_CHROM
     expect(isSupportedCapability('chrome:read', '1.7.0')).toBe(true);
     // …and the registry has not gone BACKWARDS past it.
     expect(isSupportedCapability('chrome:read', REGISTRY_VERSION)).toBe(true);
+  });
+});
+
+// ── `feed:fetch` (CONNECTOR_EGRESS_FIXING_SPEC §2, R3-227) ───────────────────
+//
+// The connector's egress capability. Its whole reason for existing separately from
+// `net:fetch` is the difference between an ALLOWLIST and a FIXED TARGET: `net:fetch`
+// takes a URL per call, so an app steered by fetched content still chooses the host,
+// the path and the body within the allowed set; `feed:fetch` takes a feed-instance id
+// and typed params, so there is no URL surface to steer.
+describe('feed:fetch — the template-bound connector egress capability', () => {
+  it('is a known, elevated, app-scoped ACTION', () => {
+    expect(isKnownCapability('feed:fetch')).toBe(true);
+    expect(CAPABILITIES['feed:fetch'].kind).toBe('action');
+    expect(tierOf('feed:fetch')).toBe('elevated');
+    expect(isAppScoped('feed:fetch')).toBe(true);
+  });
+
+  it('is HOST-parameterized — a bare on/off grant would be unbounded', () => {
+    // The durable authority is the compiled template set (origin + path + method +
+    // typed slots). Minting it as a plain capability would grant "may fetch feeds"
+    // with no feeds named, i.e. no fixed target — the exact unboundedness that keeps
+    // `net:fetch` off the plain-capability mint path.
+    expect(CAPABILITIES['feed:fetch'].parameterized).toBe(true);
+    expect(isHostParameterized('feed:fetch')).toBe(true);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).toEqual(expect.arrayContaining(['net:fetch', 'feed:fetch']));
+  });
+
+  it('is DISTINCT from net:fetch — it narrows nothing, it replaces the surface', () => {
+    // Two rows, not one row with a flag: a realm may hold one or the other, and a
+    // connector holding `net:fetch` has the URL surface back regardless of any
+    // template it was also given.
+    expect('feed:fetch' in CAPABILITIES).toBe(true);
+    expect(CAPABILITIES['feed:fetch']).not.toBe(CAPABILITIES['net:fetch']);
+  });
+
+  it('takes its OWN registry version rather than joining the published 1.7.0', () => {
+    // 1.7.0 already shipped (0.1.12, `chrome:read`). Reusing it would leave two
+    // different published vocabularies both answering "1.7.0", and a version that does
+    // not identify a vocabulary is not much of a version gate.
+    expect(CAPABILITIES['feed:fetch'].since).toBe('1.8.0');
+    expect(CAPABILITIES['chrome:read'].since).toBe('1.7.0');
+    expect(REGISTRY_VERSION).toBe('1.8.0');
+  });
+
+  it('an older host REFUSES a binding that requests it, rather than half-enforcing', () => {
+    expect(isSupportedCapability('feed:fetch', '1.7.0')).toBe(false);
+    expect(isSupportedCapability('feed:fetch', '1.8.0')).toBe(true);
+    // T26: a host that cannot enforce target-fixing must not run a connector that
+    // assumes it — so the binding fails the version gate, loudly.
+    expect(unsupportedCapabilities(['feed:fetch'], '1.7.0')).toEqual(['feed:fetch']);
+    expect(unsupportedCapabilities(['feed:fetch'], REGISTRY_VERSION)).toEqual([]);
   });
 });
