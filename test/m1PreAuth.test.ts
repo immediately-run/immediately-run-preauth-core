@@ -35,6 +35,13 @@ describe('planPreAuthCapabilities (§8.9 target check)', () => {
     expect(p.refused.every((r) => r.reason === 'broad-elevated')).toBe(true);
   });
 
+  it('auth:identity is grantable — app-scoped since R3-407, earnable by consent', () => {
+    const p = planPreAuthCapabilities(['auth:identity']);
+    expect(p.grantable).toEqual(['auth:identity']);
+    expect(p.refused).toEqual([]);
+    expect(isPreAuthClean(p)).toBe(true);
+  });
+
   it('unknown caps are refused fail-closed', () => {
     const p = planPreAuthCapabilities(['definitely:not-a-cap']);
     expect(p.refused).toEqual<PreAuthRefusal[]>([{ capability: 'definitely:not-a-cap', reason: 'unknown' }]);
@@ -121,6 +128,21 @@ describe('applyPreAuth (M1 write path)', () => {
     expect((capCall!.args as { capabilities: string[] }).capabilities.sort()).toEqual(['llm:chat', 'task:invoke']);
     // Minted at POLICY provenance (the §8.11 audit shows "by policy").
     expect((capCall!.args as { mintPath: string }).mintPath).toBe('policy');
+  });
+
+  // R3-407: identity joins the plain app-scoped mint like any other consentable.
+  it('MINTS auth:identity as a plain on/off grant through the one mint path', async () => {
+    const store = fakeStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['auth:identity'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.refused).toEqual([]);
+    expect(res.mint?.capabilitiesOk).toBe(true);
+    const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
+    expect((capCall.args as { capabilities: string[] }).capabilities).toEqual(['auth:identity']);
   });
 
   it('EXCLUDES net:fetch from the plain-cap mint (host-parameterized → hosts only, never a bare grant)', async () => {

@@ -204,6 +204,35 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
   });
 });
 
+// ── auth:identity — app-scoped-consentable identity read (R3-407) ────────────
+describe('auth:identity — earnable identity, never baseline', () => {
+  it('is an elevated READ, and NOT baseline — identity is asked for, not taken', () => {
+    // Baseline would hand the user's login/avatar to EVERY stage frame, including
+    // strangers' apps — a tracking/attribution leak. The floor stays `auth:status`.
+    expect(tierOf('auth:identity')).toBe('elevated');
+    expect(CAPABILITIES['auth:identity'].kind).toBe('read');
+    expect(isBaseline('auth:identity')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('auth:identity');
+  });
+
+  it('is app-scoped — a stage app EARNS it via declared-capability consent (R3-407)', () => {
+    expect(isAppScoped('auth:identity')).toBe(true);
+    // It joins the consentable set alongside the other app-earnable elevated caps.
+    expect(isAppScoped('llm:chat')).toBe(true);
+    expect(isAppScoped('diagnostics:read')).toBe(true);
+  });
+
+  it('is a PLAIN on/off grant — not host-parameterized (no parameter set to mint)', () => {
+    expect(isHostParameterized('auth:identity')).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain('auth:identity');
+  });
+
+  it('the sibling baseline read stays baseline — status without identity', () => {
+    expect(tierOf('auth:status')).toBe('baseline');
+    expect(isAppScoped('auth:status')).toBe(false);
+  });
+});
+
 // ── editor:reveal — the cross-activity attention move (R3-389) ───────────────
 describe('editor:reveal', () => {
   it('is an elevated action, and is NOT the same row as editor:open', () => {

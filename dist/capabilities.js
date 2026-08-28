@@ -22,7 +22,12 @@ exports.CAPABILITIES = {
     'theme:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
     'theme:set': { kind: 'action', tier: 'elevated', since: '1.0.0' },
     'auth:status': { kind: 'read', tier: 'baseline', since: '1.0.0' },
-    'auth:identity': { kind: 'read', tier: 'elevated', since: '1.0.0' },
+    // R3-407: elevated read, app-scoped — a stage app EARNS the user's login/avatar
+    // through the ordinary declared-capability consent path ('See your account'),
+    // recorded per (app, principal) like every durable grant. Never baseline:
+    // identity is asked for, not taken (an identity-by-default stage would be a
+    // tracking/attribution leak to arbitrary third-party code).
+    'auth:identity': { kind: 'read', tier: 'elevated', since: '1.0.0', appScoped: true },
     'route:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
     'formFactor:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
     'mounts:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
