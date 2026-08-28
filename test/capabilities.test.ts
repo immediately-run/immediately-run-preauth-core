@@ -186,9 +186,12 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
     // 1.7.0 already shipped (0.1.12, `chrome:read`). Reusing it would leave two
     // different published vocabularies both answering "1.7.0", and a version that does
     // not identify a vocabulary is not much of a version gate.
+    //
+    // The REGISTRY_VERSION assertion moved to the NEWEST row's test (`editor:reveal`,
+    // 1.9.0) — pinning the global here coupled this case to every future addition, so
+    // adding an unrelated capability failed a test about `feed:fetch`.
     expect(CAPABILITIES['feed:fetch'].since).toBe('1.8.0');
     expect(CAPABILITIES['chrome:read'].since).toBe('1.7.0');
-    expect(REGISTRY_VERSION).toBe('1.8.0');
   });
 
   it('an older host REFUSES a binding that requests it, rather than half-enforcing', () => {
@@ -198,5 +201,32 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
     // assumes it — so the binding fails the version gate, loudly.
     expect(unsupportedCapabilities(['feed:fetch'], '1.7.0')).toEqual(['feed:fetch']);
     expect(unsupportedCapabilities(['feed:fetch'], REGISTRY_VERSION)).toEqual([]);
+  });
+});
+
+// ── editor:reveal — the cross-activity attention move (R3-389) ───────────────
+describe('editor:reveal', () => {
+  it('is an elevated action, and is NOT the same row as editor:open', () => {
+    expect(CAPABILITIES['editor:reveal']).toEqual({ kind: 'action', tier: 'elevated', since: '1.9.0' });
+    // Two rows, not one with a flag: opening a file in the column the editor already
+    // occupies and MOVING the user to a different activity are different authorities,
+    // and the second is the parameterized escalation of the first (§8.4 / T11).
+    expect(CAPABILITIES['editor:reveal']).not.toBe(CAPABILITIES['editor:open']);
+    expect(CAPABILITIES['editor:open'].since).toBe('1.0.0');
+  });
+
+  it('takes its own registry version — 1.9.0 identifies THIS vocabulary', () => {
+    expect(CAPABILITIES['editor:reveal'].since).toBe('1.9.0');
+    expect(REGISTRY_VERSION).toBe('1.9.0');
+  });
+
+  it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
+    // A host on 1.8.0 has no cross-activity gate at all, so a binding asking for this
+    // must fail the version check loudly instead of running with the reveal silently
+    // inert — a workbench surface whose clicks do nothing is the worse outcome.
+    expect(isSupportedCapability('editor:reveal', '1.8.0')).toBe(false);
+    expect(isSupportedCapability('editor:reveal', '1.9.0')).toBe(true);
+    expect(unsupportedCapabilities(['editor:reveal'], '1.8.0')).toEqual(['editor:reveal']);
+    expect(unsupportedCapabilities(['editor:reveal'], REGISTRY_VERSION)).toEqual([]);
   });
 });

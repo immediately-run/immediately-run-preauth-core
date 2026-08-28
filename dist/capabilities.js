@@ -74,6 +74,23 @@ exports.CAPABILITIES = {
     // validates the path and drives Sandpack. Elevated — it moves the host's focus,
     // so a previewed app must not hold it; only a consented/build-default binding.
     'editor:open': { kind: 'action', tier: 'elevated', since: '1.0.0' },
+    // Bring the user TO the editor across an activity boundary (R3-389,
+    // TOOLS_ACTIVITY_SPEC §5.2). Strictly more than `editor:open`, which opens a file
+    // in whatever column the editor already occupies: an activity that owns the main
+    // pane UNMOUNTS the editor, so a surface there must be able to switch the active
+    // activity for its click to be visible at all.
+    //
+    // That is an attention move, so it is the parameterized ESCALATION of `open`
+    // (§8.4): `open({ reveal: true })` requires THIS instead of `editor:open`, and a
+    // frame holding only `editor:open` is refused rather than silently downgraded to a
+    // no-op reveal (T11).
+    //
+    // Elevated, and it buys no new REACH — the caller names a path, never an activity;
+    // the host resolves which activity owns the editor from its own state, reads its
+    // OWN `navigator.userActivation` (an app cannot forge it, and the gate fails closed
+    // without it), and rate-limits. The authority is "may ask", not "may decide where
+    // the user goes".
+    'editor:reveal': { kind: 'action', tier: 'elevated', since: '1.9.0' },
     // Mutate the editor session's working tree — create/delete/rename/upload a file
     // (migrate-sidebars Phase 04, EDITOR_AS_APP_SPEC §5.2). A NARROW, per-path gated
     // action: the file explorer NAMES a path and the HOST performs the COW write
@@ -275,7 +292,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.8.0';
+exports.REGISTRY_VERSION = '1.9.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
