@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -16,10 +16,26 @@ export interface CapabilityDef {
      *  (region binding only). In core_concepts §5 terms the consent-path is the
      *  "above-the-floor, up-to-the-ceiling → first-use consent" band: an app-scoped
      *  elevated cap sits in that band for the stage principal, a non-app-scoped one
-     *  is above the stage ceiling (granted only by a slot's elevated principal). The app-scoped set is `net:fetch`, `task:invoke`,
-     *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
-     *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
-     *  participates in the §8.15 90-day expiry like any app-scoped grant. */
+     *  is above the stage ceiling (granted only by a slot's elevated principal). The
+     *  durable grant participates in the §8.15 90-day expiry like any app-scoped grant.
+     *
+     *  **The app-scoped set, in full** — this is a security boundary, so it is stated
+     *  completely rather than by example. The authoritative form is DERIVED, never
+     *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
+     *  and `isAppScoped` is what every consumer branches on. As of registry 1.12.0 the
+     *  eleven rows carrying it are:
+     *
+     *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
+     *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
+     *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
+     *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
+     *    `device:camera` and `device:microphone` (R3-425).
+     *
+     *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
+     *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
+     *  capability: the durable authority IS their parameter set. The remaining nine are
+     *  plain on/off grants. That distinction bounds what a grant CONVEYS; it does not
+     *  narrow who may earn one, which is what `appScoped` decides. */
     appScoped?: boolean;
     /** Render this capability's consent line with the platform's **maximally-
      *  explicit** (scariest) styling, never bundled into a combined prompt
@@ -31,7 +47,39 @@ export interface CapabilityDef {
     maximallyExplicit?: boolean;
 }
 export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
-/** The current registry/vocabulary version (§5.11). Bumped to 1.8.0 with the elevated,
+/** The current registry/vocabulary version (§5.11). Bumped to 1.12.0 for a change that
+ *  adds no NAME: `auth:identity`'s reclassification to `appScoped` (R3-407). A version
+ *  is spent here for the same reason it is spent on a new row — the gate can only
+ *  compare versions, so a change of MEANING that does not move `since` is a change the
+ *  gate cannot see, and the resulting mismatch fails silently rather than loudly. The
+ *  full reasoning is on the `auth:identity` row.
+ *
+ *  Note that R3-407 originally landed the reclassification INSIDE 1.9.0, which was
+ *  already published (0.1.14) with the pre-reclassification meaning — so 1.9.0 briefly
+ *  named two different vocabularies, the exact thing the `feed:fetch` and
+ *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
+ *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
+ *  record for them.
+ *
+ *  Prior notes — bumped to 1.11.0 with the elevated,
+ *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
+ *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
+ *  ship together and a host either has the capture broker + the host-chrome indicator
+ *  or it has neither; a host on 1.10.0 refuses a binding that requests either (T26)
+ *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
+ *  in this version — see the note above the table.
+ *
+ *  Prior notes — bumped to 1.10.0 with the elevated,
+ *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
+ *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
+ *  reason `feed:fetch` did: 1.9.0 is already published (**0.1.14**, with
+ *  `editor:reveal` — commit `8f7ac42`, which is the release that bumped the package to
+ *  0.1.14; 0.1.15 is this branch's own unpublished commit, NOT a release), and a
+ *  registry version that does not identify a vocabulary is not much of a version
+ *  gate. A host older than 1.10.0 refuses a binding that requests `device:geolocation`
+ *  (T26) rather than mounting with the sensor silently inert.
+ *
+ *  Prior notes — bumped to 1.8.0 with the elevated,
  *  app-scoped, host-parameterized `feed:fetch` (`CONNECTOR_EGRESS_FIXING_SPEC` §2 —
  *  R3-227), mirroring capabilities.json. (1.7.0 added the baseline state read
  *  `chrome:read`; 1.6.0 added `analytics:emit`; 1.5.0 added the first-party-only
@@ -45,7 +93,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export declare const REGISTRY_VERSION = "1.9.0";
+export declare const REGISTRY_VERSION = "1.12.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;

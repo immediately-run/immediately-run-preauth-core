@@ -53,7 +53,10 @@ export type Capability =
   | 'diagnostics:read'
   | 'llm:chat'
   | 'authoring:run'
-  | 'analytics:emit';
+  | 'analytics:emit'
+  | 'device:geolocation'
+  | 'device:camera'
+  | 'device:microphone';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -70,10 +73,26 @@ export interface CapabilityDef {
    *  (region binding only). In core_concepts §5 terms the consent-path is the
    *  "above-the-floor, up-to-the-ceiling → first-use consent" band: an app-scoped
    *  elevated cap sits in that band for the stage principal, a non-app-scoped one
-   *  is above the stage ceiling (granted only by a slot's elevated principal). The app-scoped set is `net:fetch`, `task:invoke`,
-   *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
-   *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
-   *  participates in the §8.15 90-day expiry like any app-scoped grant. */
+   *  is above the stage ceiling (granted only by a slot's elevated principal). The
+   *  durable grant participates in the §8.15 90-day expiry like any app-scoped grant.
+   *
+   *  **The app-scoped set, in full** — this is a security boundary, so it is stated
+   *  completely rather than by example. The authoritative form is DERIVED, never
+   *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
+   *  and `isAppScoped` is what every consumer branches on. As of registry 1.12.0 the
+   *  eleven rows carrying it are:
+   *
+   *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
+   *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
+   *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
+   *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
+   *    `device:camera` and `device:microphone` (R3-425).
+   *
+   *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
+   *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
+   *  capability: the durable authority IS their parameter set. The remaining nine are
+   *  plain on/off grants. That distinction bounds what a grant CONVEYS; it does not
+   *  narrow who may earn one, which is what `appScoped` decides. */
   appScoped?: boolean;
   /** Render this capability's consent line with the platform's **maximally-
    *  explicit** (scariest) styling, never bundled into a combined prompt
@@ -89,7 +108,50 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   'theme:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'theme:set': { kind: 'action', tier: 'elevated', since: '1.0.0' },
   'auth:status': { kind: 'read', tier: 'baseline', since: '1.0.0' },
-  'auth:identity': { kind: 'read', tier: 'elevated', since: '1.0.0' },
+  // R3-407: elevated read, app-scoped — a stage app EARNS the user's login/avatar
+  // through the ordinary declared-capability consent path ('See your account'),
+  // recorded per (app, principal) like every durable grant. Never baseline:
+  // identity is asked for, not taken (an identity-by-default stage would be a
+  // tracking/attribution leak to arbitrary third-party code).
+  //
+  // **`since` is 1.12.0, not 1.0.0 — a RECLASSIFICATION takes a registry version,
+  // exactly as a new name does.** The row is old: an elevated, region-binding-only
+  // identity read has existed since 1.0.0. What R3-407 changed is `appScoped`, and
+  // that flag is not decoration — it IS the admission rule. `planPreAuthCapabilities`
+  // below and site-main's `resolveGrantedFrameCaps` both branch on `isAppScoped`, so
+  // one capability NAME means "mintable for a URL-loaded appKey" on one side of this
+  // change and "region-binding-only, drop it" on the other.
+  //
+  // Left at 1.0.0 the change was invisible to the §5.11/T26 version gate, and what
+  // that produced was a SILENT failure — the R3-233 validate-then-drop class, across
+  // a version boundary instead of a code boundary. A minter holding the new registry
+  // classifies `auth:identity` as app-scoped, mints a durable grant and answers
+  // `ok: true`; a consumer holding the old registry reads that grant back, finds
+  // `appScoped` falsy in ITS copy of this table, and drops the capability from the
+  // frame — while `planMissingPlainCaps` skips it on the same predicate, so it is not
+  // offered on the consent screen either. The user cannot grant it and nothing
+  // anywhere reports a problem.
+  //
+  // The `device:*` rows do NOT have this problem, and the difference is the whole
+  // point: they are new NAMES. An old host does not know the name, `isKnownCapability`
+  // is false, and every path refuses by name — loudly (T26, "update immediately.run").
+  // A known name whose FLAGS moved is refused nowhere, because no path compares flags
+  // across versions; only `since` is comparable across versions at all. Moving it is
+  // what puts the change back where the gate can see it.
+  //
+  // This takes nothing away from an older host: `since` is read out of the reader's
+  // OWN table, so a consumer pinned below 1.12.0 keeps exactly the row it always had,
+  // and no binding it can serve today starts being refused. What changes is that from
+  // 1.12.0 on the version NUMBER identifies which of the two meanings is in play —
+  // the same rule `feed:fetch` and `device:geolocation` each wrote down for a new
+  // name, applied to a change of meaning.
+  //
+  // `since` alone is necessary but not sufficient, because two of the three consumers
+  // of this flag never read `since`: `resolveGrantedFrameCaps` (site-main) and, until
+  // R3-407's follow-up, `planPreAuthCapabilities`. The M1 gate is now version-aware
+  // (see `m1PreAuth.ts`) so the mint path — the one that produces the orphan grant —
+  // refuses rather than mints. The frame read-back stays a defence-in-depth filter.
+  'auth:identity': { kind: 'read', tier: 'elevated', since: '1.12.0', appScoped: true },
   'route:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'formFactor:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'mounts:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
@@ -344,9 +406,145 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // platform behavior may depend on an app consuming this channel, so an app that
   // never reads it is indistinguishable from one that does.
   'chrome:read': { kind: 'read', tier: 'baseline', since: '1.7.0' },
+  // BROWSER_CAPABILITIES_SPEC §2–§4 (R3-424) — the first `device:*` row: the HOST
+  // calls `navigator.geolocation` at ITS OWN origin and hands the app coordinates.
+  // It exists because the blocker is the ORIGIN, not policy: an app frame is
+  // opaque-origin, browsers key permission grants on an origin, and
+  // `getCurrentPosition` inside the frame never prompts — it just times out
+  // (`code=3`). Widening the sandbox with `allow-same-origin` is off the table
+  // (UI_AS_APPS G1/T1), so this follows the `net:fetch` shape: the app never gets
+  // the browser handle, the host performs the privileged call and returns a
+  // serialized result.
+  //
+  // **kind: 'action', not 'read'** — deliberately, and the same call the
+  // `diagnostics:read` row made. `kind` names the ENFORCEMENT POINT, not the
+  // English verb (see this file's header): a `read` is gated by a `view()`
+  // projection on a channel the host is already maintaining (§8.3), an `action` is
+  // gated before a handler runs (§8.4). There is no standing "position" state to
+  // project — the value does not exist until the app asks the host to acquire it,
+  // which turns on a sensor and (on first use per device) raises the browser's own
+  // prompt. That is a host operation invoked on request, so §8.4 is the chokepoint
+  // and `action` is what routes it there.
+  //
+  // **Elevated + appScoped**: above the stage floor and within the stage ceiling —
+  // first use shows the powerbox consent naming the app and the device, the grant
+  // persists on `(app, principal)` and is revocable from the same surfaces as a
+  // space grant. Above the M3 ceiling: the M3 stance delegates nothing, so a
+  // stranger's app is refused with no prompt at all (G-DEV-2). NOT parameterized:
+  // the grant is a plain on/off, so it mints through the plain-cap path. A
+  // coarse/precise split would make it parameterized; that stays an open question
+  // in the spec rather than a shape guessed at here.
+  'device:geolocation': { kind: 'action', tier: 'elevated', since: '1.10.0', appScoped: true },
+  // BROWSER_CAPABILITIES_SPEC §2/§3 (R3-425) — the two CAPTURE devices. They take
+  // `device:geolocation`'s shape exactly (`action` / `elevated` / `appScoped`, plain
+  // on/off), for the same reasons written out on that row, so only what is DIFFERENT
+  // about them is recorded here.
+  //
+  // The origin blocker is harsher than geolocation's, not softer: inside the app
+  // frame `getUserMedia({video})`/`({audio})` does not merely fail to prompt, it
+  // throws `SecurityError: Invalid security origin` outright (§1, measured). And the
+  // richer result cannot be handed over either — a `MediaStreamTrack` is not
+  // transferable between windows (`DataCloneError`), while `ImageBitmap`,
+  // `ArrayBuffer`, `MessagePort` and `ReadableStream` all are. So the host opens the
+  // device at its own origin and hands the app BYTES or FRAMES, never a handle.
+  //
+  // TWO THINGS FOLLOW FROM "capture", and they are the whole reason these are not
+  // just more geolocation rows:
+  //
+  //  1. A capture has a LIVE SESSION with a duration a bystander can be caught in.
+  //     While one is open the host shows a persistent indicator in its own chrome
+  //     that the stage app cannot cover or remove (G-DEV-5) — the same rule that
+  //     keeps sign-in in host chrome. A position read has no such session and needs
+  //     no such indicator.
+  //  2. The DEFAULT delivery is a one-shot capture task drawn by the HOST
+  //     (`capture-photo@1` / `capture-audio@1`): the user frames the shot, taps Done,
+  //     and the app receives bytes. The app is never in the loop while the device is
+  //     live, so "nothing is recorded when the user cancels" is a property of the
+  //     mechanism rather than a promise the app keeps.
+  //
+  // ONE capability per device, NOT one per delivery grade. The grade (one-shot bytes
+  // vs. a live frame stream) is a property of the durable grant and the consent line
+  // the user reads — never a per-call knob the app picks — which is the same rule
+  // R3-424 wrote down for accuracy. Splitting the vocabulary by grade would mint a
+  // name per grade and force a re-consent to add one; keeping the grade off the row
+  // leaves the frame-stream grade additive.
+  //
+  // `device:clipboard` is deliberately NOT here — see the note under the table.
+  'device:camera': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
+  'device:microphone': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
 };
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.8.0 with the elevated,
+// `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
+// OUT of the vocabulary by R3-425.
+//
+// Not an oversight and not "no time": the spec's own open question is *"writes may be
+// safe at the stage floor (the sandbox already allows copy via `execCommand`); reads
+// should stay consented."* That question is about the row's TIER, and a single
+// `device:clipboard` row cannot hold two tiers. Shipping one now would answer the
+// question by accident — the exact failure R3-424 avoided by keeping the
+// coarse/precise location split out of the call params.
+//
+// The vocabulary is CLOSED and VERSIONED, which makes a name expensive: if the
+// answer turns out to be "write is baseline, read is elevated", the shape is two
+// rows (`device:clipboard-read` / `device:clipboard-write`) and the single name
+// shipped today would have to be deprecated — a published name that no longer means
+// anything, in a registry whose whole value is that a version identifies a
+// vocabulary. Nothing is lost by waiting: no capability is required to decide, and
+// adding a row is additive.
+//
+// It is also outside this item. R3-425 is camera and microphone; clipboard has no
+// capture session, no host-drawn capture surface and nothing for the G-DEV-5
+// indicator to indicate, so it would arrive with none of the machinery that makes
+// the two rows above enforceable.
+
+// WHICH PACKAGE VERSIONS ACTUALLY EXIST. `ci.yml` publishes the HEAD-OF-MAIN version
+// only — one push to main, one `npm publish` of whatever `package.json` says at that
+// commit. A branch that bumps the version several times therefore publishes exactly its
+// LAST bump, and the intermediate numbers never reach npm.
+//
+// On this branch that makes **0.1.15 and 0.1.16 intermediate branch states that are
+// never published**: 0.1.15 (`72c4217`, `auth:identity` app-scoped) and 0.1.16
+// (`edd6c16`, `device:geolocation`) exist only as commits. npm goes 0.1.14 -> 0.1.17,
+// and **0.1.17 is the release that carries all three changes**. Cite 0.1.17 as the
+// version anything on this branch ships in — a consumer that pins 0.1.15 or 0.1.16
+// fails `npm ci` with `ETARGET`, and this repo's own consumer (site-main) pins
+// EXACTLY, so it would be the one to hit it. The bumps are left in history rather than
+// collapsed; this note is what stops the next reader hunting for a release that is not
+// there.
+
+/** The current registry/vocabulary version (§5.11). Bumped to 1.12.0 for a change that
+ *  adds no NAME: `auth:identity`'s reclassification to `appScoped` (R3-407). A version
+ *  is spent here for the same reason it is spent on a new row — the gate can only
+ *  compare versions, so a change of MEANING that does not move `since` is a change the
+ *  gate cannot see, and the resulting mismatch fails silently rather than loudly. The
+ *  full reasoning is on the `auth:identity` row.
+ *
+ *  Note that R3-407 originally landed the reclassification INSIDE 1.9.0, which was
+ *  already published (0.1.14) with the pre-reclassification meaning — so 1.9.0 briefly
+ *  named two different vocabularies, the exact thing the `feed:fetch` and
+ *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
+ *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
+ *  record for them.
+ *
+ *  Prior notes — bumped to 1.11.0 with the elevated,
+ *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
+ *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
+ *  ship together and a host either has the capture broker + the host-chrome indicator
+ *  or it has neither; a host on 1.10.0 refuses a binding that requests either (T26)
+ *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
+ *  in this version — see the note above the table.
+ *
+ *  Prior notes — bumped to 1.10.0 with the elevated,
+ *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
+ *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
+ *  reason `feed:fetch` did: 1.9.0 is already published (**0.1.14**, with
+ *  `editor:reveal` — commit `8f7ac42`, which is the release that bumped the package to
+ *  0.1.14; 0.1.15 is this branch's own unpublished commit, NOT a release), and a
+ *  registry version that does not identify a vocabulary is not much of a version
+ *  gate. A host older than 1.10.0 refuses a binding that requests `device:geolocation`
+ *  (T26) rather than mounting with the sensor silently inert.
+ *
+ *  Prior notes — bumped to 1.8.0 with the elevated,
  *  app-scoped, host-parameterized `feed:fetch` (`CONNECTOR_EGRESS_FIXING_SPEC` §2 —
  *  R3-227), mirroring capabilities.json. (1.7.0 added the baseline state read
  *  `chrome:read`; 1.6.0 added `analytics:emit`; 1.5.0 added the first-party-only
@@ -360,7 +558,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.9.0';
+export const REGISTRY_VERSION = '1.12.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {

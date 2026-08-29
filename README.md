@@ -22,6 +22,20 @@ Spec: `UI_AS_APPS_SPEC.md` §8.9 (target check), §8.15 (M1 pre-authorization),
 | `bootConsent` | `mintConsentedGrants` — the ONE mint path. Environment-neutral: a caller passes `onError` instead of the core logging with a host-specific prefix. |
 | `m1PreAuth` | `planPreAuthCapabilities` / `isPreAuthClean` (the pure §8.9 target check) + `applyPreAuth` (validate-then-mint, all-or-nothing). |
 
+## Published versions
+
+`ci.yml` publishes the **head-of-main** version on each push to `main` — one push, one
+`npm publish` of whatever `package.json` reads at that commit. A branch that bumps the
+version more than once publishes only its **last** bump; the intermediate numbers are
+commits, not releases.
+
+**0.1.15 and 0.1.16 were never published.** They are intermediate states of the
+`roadmap-items-r3-407-426` branch — 0.1.15 (`auth:identity` becomes app-scoped) and
+0.1.16 (`device:geolocation`) — and npm goes straight from 0.1.14 to **0.1.17**, which
+carries all of that work. Cite 0.1.17 as the release for anything on that branch:
+pinning 0.1.15 or 0.1.16 fails `npm ci` with `ETARGET`, and site-main pins this package
+EXACTLY.
+
 ## Consuming it
 
 Via the **`file:` sibling pattern** site-main already uses for the sandpack fork:

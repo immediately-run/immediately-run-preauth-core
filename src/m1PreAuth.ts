@@ -16,13 +16,44 @@
 // `mintPath:'policy'`) and cannot drift from M3.
 //
 // THE SECURITY INVARIANT — the §8.9 target check. A pre-auth for a URL-loaded
-// `appKey` may only cover **app-scoped** elevated capabilities (`net:fetch`,
-// `task:invoke`, `contribute:self` — the set an ordinary previewed/forked app can
-// EARN per §8.9/§8.15) plus mounts (app-scoped by construction). A **broad-elevated**
-// capability — any non-app-scoped elevated cap (`spaces:user`/`spaces:admin`,
-// `editor:write`, `contribute:direct`/`contribute:any`, `editor:open`, …) — is
-// REFUSED: M1 cannot mint it for a URL-loaded appKey. Unknown capabilities are
-// refused (fail-closed). Baseline capabilities need no grant and are dropped.
+// `appKey` may only cover **app-scoped** elevated capabilities — the set an ordinary
+// previewed/forked app can EARN per §8.9/§8.15 — plus mounts (app-scoped by
+// construction). A **broad-elevated** capability — any non-app-scoped elevated cap
+// (`spaces:user`/`spaces:admin`, `editor:write`, `contribute:direct`/`contribute:any`,
+// `editor:open`, …) — is REFUSED: M1 cannot mint it for a URL-loaded appKey. Unknown
+// capabilities are refused (fail-closed), as are capabilities the CONSUMING host's
+// registry version is too old to enforce. Baseline capabilities need no grant and are
+// dropped.
+//
+// WHAT THAT SET ACTUALLY CONTAINS, stated in full because this is the boundary M1
+// pre-grants across WITHOUT A PROMPT. The check reads `isAppScoped`, so the list is
+// derived from the capability table and cannot drift from it; as of registry 1.12.0
+// the eleven app-scoped rows are:
+//
+//   `auth:identity` (R3-407) · `contribute:self` · `task:invoke` · `net:fetch` ·
+//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `analytics:emit`
+//   (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
+//   `device:microphone` (R3-425).
+//
+// So M1 can pre-grant, with no consent modal at boot, not only the original egress and
+// delegation caps but the user's IDENTITY, their LOCATION, and their CAMERA and
+// MICROPHONE. That is the shipped invariant and it is deliberate — a policy/settings
+// write path is an operator- or user-tier decision recorded ahead of time, and the
+// same §8.15 grant, expiry and revocation apply as if the modal had drawn it. It is
+// stated here so the boundary is read rather than inferred from a stale example list.
+//
+// Not overstating it, in three directions:
+//   - `net:fetch` and `feed:fetch` are HOST-PARAMETERIZED, so a pre-auth conveys their
+//     parameter set (hosts / compiled templates), never a bare "may fetch". The other
+//     nine are plain on/off grants. `applyPreAuth` filters the parameterized ones out
+//     of the plain-cap mint below.
+//   - M1 clamps WHO may hold a capability, not what the capability then does. A
+//     pre-granted `device:camera` still opens the device through the host's own capture
+//     surface, under the host-chrome indicator the app cannot cover (G-DEV-5); it does
+//     not hand the app a device handle.
+//   - Pre-auth is not the M3 stance. A stranger's app under M3 is refused these with no
+//     prompt at all (G-DEV-2); M1 is the path where an operator or the user has already
+//     decided, not a way around that refusal.
 //
 // The check is **all-or-nothing**: if a policy names ANY refused capability the
 // whole pre-auth is rejected and NOTHING is minted — a partial apply would
@@ -31,7 +62,15 @@
 // Pure decision (`planPreAuthCapabilities`/`isPreAuthClean`) + a thin store-glue
 // write path (`applyPreAuth`) that reuses `mintConsentedGrants`. No React, no UI.
 
-import { isAppScoped, isBaseline, isHostParameterized, isKnownCapability, type Capability } from './capabilities';
+import {
+  REGISTRY_VERSION,
+  isAppScoped,
+  isBaseline,
+  isHostParameterized,
+  isKnownCapability,
+  isSupportedCapability,
+  type Capability,
+} from './capabilities';
 import { mintConsentedGrants, type ConsentSelection, type MintErrorSink, type MintResult } from './bootConsent';
 import type { MintStore, NetFetchHost } from './port';
 
@@ -39,7 +78,12 @@ export type PreAuthRefusalReason =
   /** A non-app-scoped elevated cap — region-binding-only authority (§8.9). */
   | 'broad-elevated'
   /** Not in the closed capability vocabulary (§5.12) — fail-closed. */
-  | 'unknown';
+  | 'unknown'
+  /** Known here, but declared at a `since` NEWER than the host that will consume the
+   *  grant, so that host cannot enforce it (§5.11 / T26). Minting it anyway is a
+   *  validate-then-drop: the mint answers `ok` and the consumer silently discards the
+   *  capability. Refusing is the loud alternative. */
+  | 'unsupported';
 
 export interface PreAuthRefusal {
   capability: string;
@@ -58,14 +102,42 @@ export interface PreAuthPlan {
 /**
  * The pure §8.9 target check: partition requested capability names into
  * {grantable app-scoped, baseline no-op, refused}. Order-independent; total.
+ *
+ * `hostVersion` is the registry version of the host that will CONSUME the grant, and
+ * it defaults to this build's own `REGISTRY_VERSION` — so every existing caller keeps
+ * its exact behaviour (at that default, every known capability is supported). Pass it
+ * when the minter and the consumer can be on different vocabularies, which is the
+ * normal case: the backend floats its `preauth-core` range while site-main PINS one,
+ * so the minter routinely holds a newer table than the host that reads the grant back.
+ *
+ * Why the check belongs here and not only on `since`: a capability's `since` is read
+ * out of the reader's OWN table, so advancing it makes a reclassification VISIBLE to
+ * the gate but does not make the gate CONSULTED on this path — this function decided
+ * grantability from `isAppScoped` alone, with no version anywhere in it. That is how a
+ * reclassified capability (`auth:identity`, R3-407) could be minted for a host whose
+ * vocabulary still calls it region-binding-only, which then drops it from the frame and
+ * omits it from the consent screen with nothing reported: the R3-233 validate-then-drop
+ * failure, reached across a version boundary. The version check is placed before the
+ * tier branches, and so applies to baseline caps too, matching the registry merge —
+ * which likewise runs `unsupportedCapabilities` over a region's whole effective set
+ * regardless of tier, because "this host cannot enforce it" is prior to what tier it is.
  */
-export function planPreAuthCapabilities(requested: readonly string[]): PreAuthPlan {
+export function planPreAuthCapabilities(
+  requested: readonly string[],
+  hostVersion: string = REGISTRY_VERSION,
+): PreAuthPlan {
   const grantable: Capability[] = [];
   const baseline: Capability[] = [];
   const refused: PreAuthRefusal[] = [];
   for (const cap of requested) {
     if (!isKnownCapability(cap)) {
       refused.push({ capability: cap, reason: 'unknown' });
+      continue;
+    }
+    // Known to THIS registry but not to the consuming host's (§5.11/T26). Refuse
+    // rather than mint a grant that host will silently discard.
+    if (!isSupportedCapability(cap, hostVersion)) {
+      refused.push({ capability: cap, reason: 'unsupported' });
       continue;
     }
     if (isBaseline(cap)) {
@@ -122,8 +194,13 @@ export interface PreAuthResult {
  * unbounded).
  *
  * Refusal is terminal and silent of side effects: when any requested capability
- * is broad-elevated or unknown, the function mints NOTHING and returns the
- * refusals — the caller surfaces them (the policy is malformed/over-broad).
+ * is broad-elevated, unknown, or unsupported by the consuming host, the function
+ * mints NOTHING and returns the refusals — the caller surfaces them (the policy is
+ * malformed, over-broad, or aimed at a host too old to enforce what it asks for).
+ *
+ * `hostVersion` is forwarded to the target check: pass the registry version of the
+ * host that will consume these grants when it may differ from this build's. It
+ * defaults to this build's own, which preserves every existing caller's behaviour.
  */
 export async function applyPreAuth(
   store: MintStore,
@@ -131,8 +208,9 @@ export async function applyPreAuth(
   appKey: string,
   request: PreAuthRequest,
   onError?: MintErrorSink,
+  hostVersion?: string,
 ): Promise<PreAuthResult> {
-  const plan = planPreAuthCapabilities(request.capabilities);
+  const plan = planPreAuthCapabilities(request.capabilities, hostVersion);
   if (!isPreAuthClean(plan)) {
     return { ok: false, refused: plan.refused };
   }

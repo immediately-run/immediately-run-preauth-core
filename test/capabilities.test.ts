@@ -187,9 +187,12 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
     // different published vocabularies both answering "1.7.0", and a version that does
     // not identify a vocabulary is not much of a version gate.
     //
-    // The REGISTRY_VERSION assertion moved to the NEWEST row's test (`editor:reveal`,
-    // 1.9.0) — pinning the global here coupled this case to every future addition, so
-    // adding an unrelated capability failed a test about `feed:fetch`.
+    // The global REGISTRY_VERSION assertion does NOT live here — pinning it here
+    // coupled this case to every future addition, so adding an unrelated capability
+    // failed a test about `feed:fetch`. It sits on the NEWEST vocabulary's test, which
+    // is `auth:identity`'s reclassification (1.12.0). It has moved twice since this
+    // comment first named `editor:reveal`, which is the argument for not naming a
+    // moving target in three places: assert what THIS row owns, and nothing else.
     expect(CAPABILITIES['feed:fetch'].since).toBe('1.8.0');
     expect(CAPABILITIES['chrome:read'].since).toBe('1.7.0');
   });
@@ -204,6 +207,81 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
   });
 });
 
+// ── auth:identity — app-scoped-consentable identity read (R3-407) ────────────
+describe('auth:identity — earnable identity, never baseline', () => {
+  it('is an elevated READ, and NOT baseline — identity is asked for, not taken', () => {
+    // Baseline would hand the user's login/avatar to EVERY stage frame, including
+    // strangers' apps — a tracking/attribution leak. The floor stays `auth:status`.
+    expect(tierOf('auth:identity')).toBe('elevated');
+    expect(CAPABILITIES['auth:identity'].kind).toBe('read');
+    expect(isBaseline('auth:identity')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('auth:identity');
+  });
+
+  it('is app-scoped — a stage app EARNS it via declared-capability consent (R3-407)', () => {
+    expect(isAppScoped('auth:identity')).toBe(true);
+    // It joins the consentable set alongside the other app-earnable elevated caps.
+    expect(isAppScoped('llm:chat')).toBe(true);
+    expect(isAppScoped('diagnostics:read')).toBe(true);
+  });
+
+  it('is a PLAIN on/off grant — not host-parameterized (no parameter set to mint)', () => {
+    expect(isHostParameterized('auth:identity')).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain('auth:identity');
+  });
+
+  it('the sibling baseline read stays baseline — status without identity', () => {
+    expect(tierOf('auth:status')).toBe('baseline');
+    expect(isAppScoped('auth:status')).toBe(false);
+  });
+});
+
+// ── the R3-407 RECLASSIFICATION is itself versioned (registry 1.12.0) ─────────
+//
+// `auth:identity` is an OLD name whose MEANING moved: `appScoped` flipped, and that
+// flag is the admission rule two different consumers branch on. A reclassification
+// left at the original `since` is invisible to the §5.11/T26 gate, and the mismatch
+// it produces is SILENT — a minter on the new vocabulary mints a grant a consumer on
+// the old one drops from the frame and omits from the consent screen, with nothing
+// reported. New NAMES (`device:*`) never do this: an old host does not know the name,
+// so every path refuses by name, loudly. `since` is the only field comparable across
+// versions, so it is the only place a change of meaning can be recorded.
+describe('auth:identity — the reclassification takes a registry version (R3-407)', () => {
+  it('`since` names the vocabulary that RECLASSIFIED the row, not the one that named it', () => {
+    // 1.0.0 described the pre-R3-407 row: elevated, region-binding-only. The row a
+    // host must be at 1.12.0 to serve is the app-scoped, consent-earnable one.
+    expect(CAPABILITIES['auth:identity'].since).toBe('1.12.0');
+    expect(isAppScoped('auth:identity')).toBe(true);
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test,
+    // which is this one — pinning it on an older row's case would couple that case to
+    // every future addition.
+    expect(REGISTRY_VERSION).toBe('1.12.0');
+  });
+
+  it('a host on the PRE-reclassification vocabulary is REFUSED, not silently drained', () => {
+    // This is the version boundary the whole fix is about. 1.11.0 is the last
+    // vocabulary in which `auth:identity` was region-binding-only. A consumer there
+    // cannot honour an app-scoped `auth:identity` grant: its own `isAppScoped` answers
+    // false, so the frame read-back drops the capability AND the consent screen never
+    // offers it. T26 turns that into a refusal the user can act on ("update
+    // immediately.run") instead of a capability that quietly never arrives.
+    expect(isSupportedCapability('auth:identity', '1.11.0')).toBe(false);
+    expect(unsupportedCapabilities(['auth:identity'], '1.11.0')).toEqual(['auth:identity']);
+    // ...and it is supported from the reclassifying vocabulary onward.
+    expect(isSupportedCapability('auth:identity', '1.12.0')).toBe(true);
+    expect(unsupportedCapabilities(['auth:identity'], REGISTRY_VERSION)).toEqual([]);
+  });
+
+  it('no OTHER row moves — only the row whose meaning changed', () => {
+    // Sliding an unrelated `since` forward would make every prior host refuse bindings
+    // it can in fact serve. `auth:status` never changed meaning, so it never moves.
+    expect(CAPABILITIES['auth:status'].since).toBe('1.0.0');
+    expect(isSupportedCapability('auth:status', '1.0.0')).toBe(true);
+    expect(CAPABILITIES['device:camera'].since).toBe('1.11.0');
+    expect(isSupportedCapability('device:camera', '1.11.0')).toBe(true);
+  });
+});
+
 // ── editor:reveal — the cross-activity attention move (R3-389) ───────────────
 describe('editor:reveal', () => {
   it('is an elevated action, and is NOT the same row as editor:open', () => {
@@ -215,9 +293,11 @@ describe('editor:reveal', () => {
     expect(CAPABILITIES['editor:open'].since).toBe('1.0.0');
   });
 
-  it('takes its own registry version — 1.9.0 identifies THIS vocabulary', () => {
+  it('takes its own registry version — 1.9.0 identifies THAT vocabulary', () => {
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test —
+    // currently `auth:identity`'s reclassification (1.12.0) — never here: pinning it
+    // on this row would couple the case to every future addition.
     expect(CAPABILITIES['editor:reveal'].since).toBe('1.9.0');
-    expect(REGISTRY_VERSION).toBe('1.9.0');
   });
 
   it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
@@ -228,5 +308,157 @@ describe('editor:reveal', () => {
     expect(isSupportedCapability('editor:reveal', '1.9.0')).toBe(true);
     expect(unsupportedCapabilities(['editor:reveal'], '1.8.0')).toEqual(['editor:reveal']);
     expect(unsupportedCapabilities(['editor:reveal'], REGISTRY_VERSION)).toEqual([]);
+  });
+});
+
+// ── device:geolocation — the first host-brokered device capability (R3-424) ──
+// BROWSER_CAPABILITIES_SPEC §2–§4. The host calls `navigator.geolocation` at its own
+// origin and returns coordinates; the app never touches the browser handle.
+describe('device:geolocation — host-brokered position, earned by consent', () => {
+  it('is an ELEVATED action, and is NOT baseline', () => {
+    // Baseline would hand every stage frame — including a stranger's app — the
+    // user's physical location with no consent line and nothing to revoke.
+    expect(tierOf('device:geolocation')).toBe('elevated');
+    expect(isBaseline('device:geolocation')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('device:geolocation');
+  });
+
+  it("kind is 'action' — the §8.4 gate, not an §8.3 channel projection", () => {
+    // `kind` names the enforcement point, not the English verb (the same call
+    // `diagnostics:read` made). There is no standing position state to project:
+    // the value does not exist until the app asks the host to acquire it, which
+    // turns on a sensor and can raise the browser's own prompt.
+    expect(CAPABILITIES['device:geolocation'].kind).toBe('action');
+    expect(CAPABILITIES['diagnostics:read'].kind).toBe('action');
+  });
+
+  it('is app-scoped — a stage app EARNS it via the powerbox consent', () => {
+    expect(isAppScoped('device:geolocation')).toBe(true);
+    // It joins the consentable set alongside the other app-earnable elevated caps.
+    expect(isAppScoped('llm:chat')).toBe(true);
+    expect(isAppScoped('auth:identity')).toBe(true);
+  });
+
+  it('is a PLAIN on/off grant — not host-parameterized', () => {
+    // A coarse/precise split would make the grant a parameter set (like net:fetch's
+    // host list) and exclude it from the plain-cap mint. The spec leaves that an
+    // open question, so the shape stays plain until it is decided.
+    expect(isHostParameterized('device:geolocation')).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain('device:geolocation');
+    expect(CAPABILITIES['device:geolocation'].parameterized).toBeUndefined();
+  });
+
+  it('is known, and takes its own registry version — 1.10.0 identifies THAT vocabulary', () => {
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test —
+    // currently `auth:identity`'s reclassification (1.12.0) — never here: pinning it
+    // on this row would couple the case to every future addition.
+    expect(isKnownCapability('device:geolocation')).toBe(true);
+    expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
+  });
+
+  it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
+    // A host on 1.9.0 has no device broker at all. Mounting a region that asked for
+    // position and silently never delivering one is the worse outcome (T26).
+    expect(isSupportedCapability('device:geolocation', '1.9.0')).toBe(false);
+    expect(isSupportedCapability('device:geolocation', '1.10.0')).toBe(true);
+    expect(unsupportedCapabilities(['device:geolocation'], '1.9.0')).toEqual(['device:geolocation']);
+    expect(unsupportedCapabilities(['device:geolocation'], REGISTRY_VERSION)).toEqual([]);
+  });
+
+  it('is unaffected by the R3-425 additions — its `since` does not move', () => {
+    // A row's `since` is the version a host must be at to enforce it. Sliding an
+    // existing row's `since` forward with each addition would make every prior host
+    // refuse bindings it can in fact serve.
+    expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
+    expect(isSupportedCapability('device:geolocation', '1.10.0')).toBe(true);
+  });
+});
+
+// ── device:camera / device:microphone — the CAPTURE devices (R3-425) ──
+// BROWSER_CAPABILITIES_SPEC §2/§3. Inside the app frame `getUserMedia` throws
+// `SecurityError: Invalid security origin`, and a `MediaStreamTrack` is not
+// transferable between windows — so the host opens the device at its own origin and
+// hands the app BYTES (the one-shot capture task) or FRAMES, never a handle.
+describe('device:camera / device:microphone — host-brokered capture, earned by consent', () => {
+  const CAPTURE = ['device:camera', 'device:microphone'] as const;
+
+  it.each(CAPTURE)('%s is an ELEVATED action, and is NOT baseline', (cap) => {
+    // Baseline would let a stranger's app open the camera with no consent line and
+    // nothing to revoke — strictly worse than the location case, because a capture
+    // catches bystanders who never chose anything.
+    expect(tierOf(cap)).toBe('elevated');
+    expect(isBaseline(cap)).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain(cap);
+  });
+
+  it.each(CAPTURE)("%s kind is 'action' — the §8.4 gate, not an §8.3 projection", (cap) => {
+    // Same reasoning as `device:geolocation`: there is no standing "camera" state to
+    // project. The value does not exist until the app asks the host to acquire it,
+    // which turns on a device. That is a host operation invoked on request.
+    expect(CAPABILITIES[cap].kind).toBe('action');
+  });
+
+  it.each(CAPTURE)('%s is app-scoped — a stage app EARNS it via the powerbox consent', (cap) => {
+    expect(isAppScoped(cap)).toBe(true);
+  });
+
+  it.each(CAPTURE)('%s is a PLAIN on/off grant — the delivery GRADE is not in the row', (cap) => {
+    // One capability per DEVICE, not one per grade. Which grade an app may have is a
+    // property of the durable grant and the consent line the user reads; splitting
+    // the vocabulary by grade would mint a name per grade and force a re-consent to
+    // add one. Keeping the grade off the row leaves the frame-stream grade additive.
+    expect(isHostParameterized(cap)).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain(cap);
+    expect(CAPABILITIES[cap].parameterized).toBeUndefined();
+  });
+
+  it.each(CAPTURE)('%s takes the same shape as device:geolocation, field for field', (cap) => {
+    // The point of the assertion: the capture rows are not a new KIND of thing. If a
+    // future change moves one of these four fields on the geolocation row, this fails
+    // and the divergence has to be argued rather than drifted into.
+    const geo = CAPABILITIES['device:geolocation'];
+    const def = CAPABILITIES[cap];
+    expect(def.kind).toBe(geo.kind);
+    expect(def.tier).toBe(geo.tier);
+    expect(def.appScoped).toBe(geo.appScoped);
+    expect(def.maximallyExplicit).toBe(geo.maximallyExplicit);
+  });
+
+  it('both are known, and share ONE registry version — 1.11.0 identifies THIS vocabulary', () => {
+    // They ship together because a host either has the capture broker AND the
+    // host-chrome indicator or it has neither; two versions would imply a host that
+    // can serve a microphone but not a camera, which no host will ever be.
+    //
+    // The global REGISTRY_VERSION assertion has moved on to the newest vocabulary's
+    // test (`auth:identity`'s reclassification, 1.12.0) — keeping it here would couple
+    // this case to every future addition.
+    for (const cap of CAPTURE) {
+      expect(isKnownCapability(cap)).toBe(true);
+      expect(CAPABILITIES[cap].since).toBe('1.11.0');
+    }
+  });
+
+  it('an older host REFUSES a binding that requests either rather than half-enforcing', () => {
+    // A host on 1.10.0 has the geolocation broker but no capture surface and no
+    // host-chrome indicator. Mounting a region that asked for the camera and
+    // silently never opening it — or worse, opening it with no indicator — is the
+    // outcome T26 exists to prevent.
+    for (const cap of CAPTURE) {
+      expect(isSupportedCapability(cap, '1.10.0')).toBe(false);
+      expect(isSupportedCapability(cap, '1.11.0')).toBe(true);
+      expect(unsupportedCapabilities([cap], '1.10.0')).toEqual([cap]);
+      expect(unsupportedCapabilities([cap], REGISTRY_VERSION)).toEqual([]);
+    }
+  });
+
+  it('there are exactly THREE device rows — `device:clipboard` is deliberately NOT shipped', () => {
+    // §2 proposes four. Clipboard is left out on purpose: the spec's own open
+    // question is whether WRITES belong at the stage floor while READS stay
+    // consented, and one row cannot hold two tiers. Shipping `device:clipboard` now
+    // would answer that by accident, and the name would have to be deprecated if the
+    // answer is a read/write split — expensive in a closed, versioned vocabulary.
+    const deviceCaps = Object.keys(CAPABILITIES).filter((c) => c.startsWith('device:')).sort();
+    expect(deviceCaps).toEqual(['device:camera', 'device:geolocation', 'device:microphone']);
+    expect(isKnownCapability('device:clipboard')).toBe(false);
   });
 });
