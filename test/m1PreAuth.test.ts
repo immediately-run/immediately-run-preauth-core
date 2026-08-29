@@ -8,6 +8,7 @@ import {
   applyPreAuth,
   type PreAuthRefusal,
 } from '../src/m1PreAuth';
+import { CAPABILITIES } from '../src/capabilities';
 import type { ConsentSelection } from '../src/bootConsent';
 import type { MintStore, NetFetchHost } from '../src/port';
 
@@ -40,6 +41,52 @@ describe('planPreAuthCapabilities (§8.9 target check)', () => {
     expect(p.grantable).toEqual(['auth:identity']);
     expect(p.refused).toEqual([]);
     expect(isPreAuthClean(p)).toBe(true);
+  });
+
+  // The version boundary. The minter and the consumer are routinely on DIFFERENT
+  // vocabularies — the backend floats its `preauth-core` range while site-main pins
+  // one — so the minter can hold a table in which `auth:identity` is app-scoped while
+  // the consumer holds one in which it is region-binding-only.
+  it('auth:identity is REFUSED for a host below the reclassification, not minted-then-dropped', () => {
+    // Without the version check this returned `grantable: ['auth:identity']` and the
+    // caller minted a durable grant the 1.11.0 consumer then discarded: dropped from
+    // the frame by `resolveGrantedFrameCaps` (its `isAppScoped` is false there) and
+    // omitted from the consent screen by `planMissingPlainCaps` on the same predicate.
+    // The mint reported success, the app never got the capability, and no surface said
+    // so — R3-233's validate-then-drop, reached across a version boundary.
+    const p = planPreAuthCapabilities(['auth:identity'], '1.11.0');
+    expect(p.grantable).toEqual([]);
+    expect(p.refused).toEqual<PreAuthRefusal[]>([{ capability: 'auth:identity', reason: 'unsupported' }]);
+    expect(isPreAuthClean(p)).toBe(false);
+  });
+
+  it('the same request is clean on a host that HAS the reclassification', () => {
+    const p = planPreAuthCapabilities(['auth:identity'], '1.12.0');
+    expect(p.grantable).toEqual(['auth:identity']);
+    expect(p.refused).toEqual([]);
+    expect(isPreAuthClean(p)).toBe(true);
+  });
+
+  it('the version check applies to every tier, matching the registry merge', () => {
+    // `unsupportedCapabilities` is run over a region's whole effective set regardless
+    // of tier, because "this host cannot enforce it" is prior to what tier it is. A
+    // baseline cap the host is too old for would otherwise be dropped as a silent
+    // no-op — the same shape of silence, one tier down.
+    expect(planPreAuthCapabilities(['chrome:read'], '1.6.0').refused).toEqual<PreAuthRefusal[]>([
+      { capability: 'chrome:read', reason: 'unsupported' },
+    ]);
+    expect(planPreAuthCapabilities(['chrome:read'], '1.7.0').baseline).toEqual(['chrome:read']);
+  });
+
+  it('omitting hostVersion means THIS build — every existing caller is unaffected', () => {
+    // At the default every known capability is supported by construction, so the new
+    // branch can never fire for a caller that does not opt in: the only refusals left
+    // are the two §8.9 has always issued. (`broad-elevated` rows still refuse — that
+    // is the target check doing its original job, not the version gate.)
+    for (const cap of Object.keys(CAPABILITIES)) {
+      const reasons = planPreAuthCapabilities([cap]).refused.map((r) => r.reason);
+      expect(reasons).not.toContain('unsupported');
+    }
   });
 
   it('device:geolocation is grantable — app-scoped since R3-424, earnable by consent', () => {

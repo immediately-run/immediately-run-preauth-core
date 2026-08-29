@@ -31,7 +31,21 @@ export interface CapabilityDef {
     maximallyExplicit?: boolean;
 }
 export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
-/** The current registry/vocabulary version (§5.11). Bumped to 1.11.0 with the elevated,
+/** The current registry/vocabulary version (§5.11). Bumped to 1.12.0 for a change that
+ *  adds no NAME: `auth:identity`'s reclassification to `appScoped` (R3-407). A version
+ *  is spent here for the same reason it is spent on a new row — the gate can only
+ *  compare versions, so a change of MEANING that does not move `since` is a change the
+ *  gate cannot see, and the resulting mismatch fails silently rather than loudly. The
+ *  full reasoning is on the `auth:identity` row.
+ *
+ *  Note that R3-407 originally landed the reclassification INSIDE 1.9.0, which was
+ *  already published (0.1.14) with the pre-reclassification meaning — so 1.9.0 briefly
+ *  named two different vocabularies, the exact thing the `feed:fetch` and
+ *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
+ *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
+ *  record for them.
+ *
+ *  Prior notes — bumped to 1.11.0 with the elevated,
  *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
  *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
  *  ship together and a host either has the capture broker + the host-chrome indicator
@@ -61,7 +75,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export declare const REGISTRY_VERSION = "1.11.0";
+export declare const REGISTRY_VERSION = "1.12.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;

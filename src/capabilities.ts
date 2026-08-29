@@ -97,7 +97,45 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // recorded per (app, principal) like every durable grant. Never baseline:
   // identity is asked for, not taken (an identity-by-default stage would be a
   // tracking/attribution leak to arbitrary third-party code).
-  'auth:identity': { kind: 'read', tier: 'elevated', since: '1.0.0', appScoped: true },
+  //
+  // **`since` is 1.12.0, not 1.0.0 — a RECLASSIFICATION takes a registry version,
+  // exactly as a new name does.** The row is old: an elevated, region-binding-only
+  // identity read has existed since 1.0.0. What R3-407 changed is `appScoped`, and
+  // that flag is not decoration — it IS the admission rule. `planPreAuthCapabilities`
+  // below and site-main's `resolveGrantedFrameCaps` both branch on `isAppScoped`, so
+  // one capability NAME means "mintable for a URL-loaded appKey" on one side of this
+  // change and "region-binding-only, drop it" on the other.
+  //
+  // Left at 1.0.0 the change was invisible to the §5.11/T26 version gate, and what
+  // that produced was a SILENT failure — the R3-233 validate-then-drop class, across
+  // a version boundary instead of a code boundary. A minter holding the new registry
+  // classifies `auth:identity` as app-scoped, mints a durable grant and answers
+  // `ok: true`; a consumer holding the old registry reads that grant back, finds
+  // `appScoped` falsy in ITS copy of this table, and drops the capability from the
+  // frame — while `planMissingPlainCaps` skips it on the same predicate, so it is not
+  // offered on the consent screen either. The user cannot grant it and nothing
+  // anywhere reports a problem.
+  //
+  // The `device:*` rows do NOT have this problem, and the difference is the whole
+  // point: they are new NAMES. An old host does not know the name, `isKnownCapability`
+  // is false, and every path refuses by name — loudly (T26, "update immediately.run").
+  // A known name whose FLAGS moved is refused nowhere, because no path compares flags
+  // across versions; only `since` is comparable across versions at all. Moving it is
+  // what puts the change back where the gate can see it.
+  //
+  // This takes nothing away from an older host: `since` is read out of the reader's
+  // OWN table, so a consumer pinned below 1.12.0 keeps exactly the row it always had,
+  // and no binding it can serve today starts being refused. What changes is that from
+  // 1.12.0 on the version NUMBER identifies which of the two meanings is in play —
+  // the same rule `feed:fetch` and `device:geolocation` each wrote down for a new
+  // name, applied to a change of meaning.
+  //
+  // `since` alone is necessary but not sufficient, because two of the three consumers
+  // of this flag never read `since`: `resolveGrantedFrameCaps` (site-main) and, until
+  // R3-407's follow-up, `planPreAuthCapabilities`. The M1 gate is now version-aware
+  // (see `m1PreAuth.ts`) so the mint path — the one that produces the orphan grant —
+  // refuses rather than mints. The frame read-back stays a defence-in-depth filter.
+  'auth:identity': { kind: 'read', tier: 'elevated', since: '1.12.0', appScoped: true },
   'route:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'formFactor:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
   'mounts:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
@@ -443,7 +481,21 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
 // indicator to indicate, so it would arrive with none of the machinery that makes
 // the two rows above enforceable.
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.11.0 with the elevated,
+/** The current registry/vocabulary version (§5.11). Bumped to 1.12.0 for a change that
+ *  adds no NAME: `auth:identity`'s reclassification to `appScoped` (R3-407). A version
+ *  is spent here for the same reason it is spent on a new row — the gate can only
+ *  compare versions, so a change of MEANING that does not move `since` is a change the
+ *  gate cannot see, and the resulting mismatch fails silently rather than loudly. The
+ *  full reasoning is on the `auth:identity` row.
+ *
+ *  Note that R3-407 originally landed the reclassification INSIDE 1.9.0, which was
+ *  already published (0.1.14) with the pre-reclassification meaning — so 1.9.0 briefly
+ *  named two different vocabularies, the exact thing the `feed:fetch` and
+ *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
+ *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
+ *  record for them.
+ *
+ *  Prior notes — bumped to 1.11.0 with the elevated,
  *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
  *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
  *  ship together and a host either has the capture broker + the host-chrome indicator
@@ -473,7 +525,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.11.0';
+export const REGISTRY_VERSION = '1.12.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {

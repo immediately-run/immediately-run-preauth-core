@@ -233,6 +233,52 @@ describe('auth:identity — earnable identity, never baseline', () => {
   });
 });
 
+// ── the R3-407 RECLASSIFICATION is itself versioned (registry 1.12.0) ─────────
+//
+// `auth:identity` is an OLD name whose MEANING moved: `appScoped` flipped, and that
+// flag is the admission rule two different consumers branch on. A reclassification
+// left at the original `since` is invisible to the §5.11/T26 gate, and the mismatch
+// it produces is SILENT — a minter on the new vocabulary mints a grant a consumer on
+// the old one drops from the frame and omits from the consent screen, with nothing
+// reported. New NAMES (`device:*`) never do this: an old host does not know the name,
+// so every path refuses by name, loudly. `since` is the only field comparable across
+// versions, so it is the only place a change of meaning can be recorded.
+describe('auth:identity — the reclassification takes a registry version (R3-407)', () => {
+  it('`since` names the vocabulary that RECLASSIFIED the row, not the one that named it', () => {
+    // 1.0.0 described the pre-R3-407 row: elevated, region-binding-only. The row a
+    // host must be at 1.12.0 to serve is the app-scoped, consent-earnable one.
+    expect(CAPABILITIES['auth:identity'].since).toBe('1.12.0');
+    expect(isAppScoped('auth:identity')).toBe(true);
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test,
+    // which is this one — pinning it on an older row's case would couple that case to
+    // every future addition.
+    expect(REGISTRY_VERSION).toBe('1.12.0');
+  });
+
+  it('a host on the PRE-reclassification vocabulary is REFUSED, not silently drained', () => {
+    // This is the version boundary the whole fix is about. 1.11.0 is the last
+    // vocabulary in which `auth:identity` was region-binding-only. A consumer there
+    // cannot honour an app-scoped `auth:identity` grant: its own `isAppScoped` answers
+    // false, so the frame read-back drops the capability AND the consent screen never
+    // offers it. T26 turns that into a refusal the user can act on ("update
+    // immediately.run") instead of a capability that quietly never arrives.
+    expect(isSupportedCapability('auth:identity', '1.11.0')).toBe(false);
+    expect(unsupportedCapabilities(['auth:identity'], '1.11.0')).toEqual(['auth:identity']);
+    // ...and it is supported from the reclassifying vocabulary onward.
+    expect(isSupportedCapability('auth:identity', '1.12.0')).toBe(true);
+    expect(unsupportedCapabilities(['auth:identity'], REGISTRY_VERSION)).toEqual([]);
+  });
+
+  it('no OTHER row moves — only the row whose meaning changed', () => {
+    // Sliding an unrelated `since` forward would make every prior host refuse bindings
+    // it can in fact serve. `auth:status` never changed meaning, so it never moves.
+    expect(CAPABILITIES['auth:status'].since).toBe('1.0.0');
+    expect(isSupportedCapability('auth:status', '1.0.0')).toBe(true);
+    expect(CAPABILITIES['device:camera'].since).toBe('1.11.0');
+    expect(isSupportedCapability('device:camera', '1.11.0')).toBe(true);
+  });
+});
+
 // ── editor:reveal — the cross-activity attention move (R3-389) ───────────────
 describe('editor:reveal', () => {
   it('is an elevated action, and is NOT the same row as editor:open', () => {
@@ -379,11 +425,14 @@ describe('device:camera / device:microphone — host-brokered capture, earned by
     // They ship together because a host either has the capture broker AND the
     // host-chrome indicator or it has neither; two versions would imply a host that
     // can serve a microphone but not a camera, which no host will ever be.
+    //
+    // The global REGISTRY_VERSION assertion has moved on to the newest vocabulary's
+    // test (`auth:identity`'s reclassification, 1.12.0) — keeping it here would couple
+    // this case to every future addition.
     for (const cap of CAPTURE) {
       expect(isKnownCapability(cap)).toBe(true);
       expect(CAPABILITIES[cap].since).toBe('1.11.0');
     }
-    expect(REGISTRY_VERSION).toBe('1.11.0');
   });
 
   it('an older host REFUSES a binding that requests either rather than half-enforcing', () => {
