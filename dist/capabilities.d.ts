@@ -56,8 +56,10 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  Prior notes — bumped to 1.10.0 with the elevated,
  *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
  *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
- *  reason `feed:fetch` did: 1.9.0 is already published (0.1.15, with `editor:reveal`),
- *  and a registry version that does not identify a vocabulary is not much of a version
+ *  reason `feed:fetch` did: 1.9.0 is already published (**0.1.14**, with
+ *  `editor:reveal` — commit `8f7ac42`, which is the release that bumped the package to
+ *  0.1.14; 0.1.15 is this branch's own unpublished commit, NOT a release), and a
+ *  registry version that does not identify a vocabulary is not much of a version
  *  gate. A host older than 1.10.0 refuses a binding that requests `device:geolocation`
  *  (T26) rather than mounting with the sensor silently inert.
  *

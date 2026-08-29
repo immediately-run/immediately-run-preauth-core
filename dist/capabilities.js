@@ -409,6 +409,20 @@ exports.CAPABILITIES = {
 // capture session, no host-drawn capture surface and nothing for the G-DEV-5
 // indicator to indicate, so it would arrive with none of the machinery that makes
 // the two rows above enforceable.
+// WHICH PACKAGE VERSIONS ACTUALLY EXIST. `ci.yml` publishes the HEAD-OF-MAIN version
+// only — one push to main, one `npm publish` of whatever `package.json` says at that
+// commit. A branch that bumps the version several times therefore publishes exactly its
+// LAST bump, and the intermediate numbers never reach npm.
+//
+// On this branch that makes **0.1.15 and 0.1.16 intermediate branch states that are
+// never published**: 0.1.15 (`72c4217`, `auth:identity` app-scoped) and 0.1.16
+// (`edd6c16`, `device:geolocation`) exist only as commits. npm goes 0.1.14 -> 0.1.17,
+// and **0.1.17 is the release that carries all three changes**. Cite 0.1.17 as the
+// version anything on this branch ships in — a consumer that pins 0.1.15 or 0.1.16
+// fails `npm ci` with `ETARGET`, and this repo's own consumer (site-main) pins
+// EXACTLY, so it would be the one to hit it. The bumps are left in history rather than
+// collapsed; this note is what stops the next reader hunting for a release that is not
+// there.
 /** The current registry/vocabulary version (§5.11). Bumped to 1.12.0 for a change that
  *  adds no NAME: `auth:identity`'s reclassification to `appScoped` (R3-407). A version
  *  is spent here for the same reason it is spent on a new row — the gate can only
@@ -434,8 +448,10 @@ exports.CAPABILITIES = {
  *  Prior notes — bumped to 1.10.0 with the elevated,
  *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
  *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
- *  reason `feed:fetch` did: 1.9.0 is already published (0.1.15, with `editor:reveal`),
- *  and a registry version that does not identify a vocabulary is not much of a version
+ *  reason `feed:fetch` did: 1.9.0 is already published (**0.1.14**, with
+ *  `editor:reveal` — commit `8f7ac42`, which is the release that bumped the package to
+ *  0.1.14; 0.1.15 is this branch's own unpublished commit, NOT a release), and a
+ *  registry version that does not identify a vocabulary is not much of a version
  *  gate. A host older than 1.10.0 refuses a binding that requests `device:geolocation`
  *  (T26) rather than mounting with the sensor silently inert.
  *
