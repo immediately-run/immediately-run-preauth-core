@@ -17,13 +17,44 @@
 // `mintPath:'policy'`) and cannot drift from M3.
 //
 // THE SECURITY INVARIANT — the §8.9 target check. A pre-auth for a URL-loaded
-// `appKey` may only cover **app-scoped** elevated capabilities (`net:fetch`,
-// `task:invoke`, `contribute:self` — the set an ordinary previewed/forked app can
-// EARN per §8.9/§8.15) plus mounts (app-scoped by construction). A **broad-elevated**
-// capability — any non-app-scoped elevated cap (`spaces:user`/`spaces:admin`,
-// `editor:write`, `contribute:direct`/`contribute:any`, `editor:open`, …) — is
-// REFUSED: M1 cannot mint it for a URL-loaded appKey. Unknown capabilities are
-// refused (fail-closed). Baseline capabilities need no grant and are dropped.
+// `appKey` may only cover **app-scoped** elevated capabilities — the set an ordinary
+// previewed/forked app can EARN per §8.9/§8.15 — plus mounts (app-scoped by
+// construction). A **broad-elevated** capability — any non-app-scoped elevated cap
+// (`spaces:user`/`spaces:admin`, `editor:write`, `contribute:direct`/`contribute:any`,
+// `editor:open`, …) — is REFUSED: M1 cannot mint it for a URL-loaded appKey. Unknown
+// capabilities are refused (fail-closed), as are capabilities the CONSUMING host's
+// registry version is too old to enforce. Baseline capabilities need no grant and are
+// dropped.
+//
+// WHAT THAT SET ACTUALLY CONTAINS, stated in full because this is the boundary M1
+// pre-grants across WITHOUT A PROMPT. The check reads `isAppScoped`, so the list is
+// derived from the capability table and cannot drift from it; as of registry 1.12.0
+// the eleven app-scoped rows are:
+//
+//   `auth:identity` (R3-407) · `contribute:self` · `task:invoke` · `net:fetch` ·
+//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `analytics:emit`
+//   (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
+//   `device:microphone` (R3-425).
+//
+// So M1 can pre-grant, with no consent modal at boot, not only the original egress and
+// delegation caps but the user's IDENTITY, their LOCATION, and their CAMERA and
+// MICROPHONE. That is the shipped invariant and it is deliberate — a policy/settings
+// write path is an operator- or user-tier decision recorded ahead of time, and the
+// same §8.15 grant, expiry and revocation apply as if the modal had drawn it. It is
+// stated here so the boundary is read rather than inferred from a stale example list.
+//
+// Not overstating it, in three directions:
+//   - `net:fetch` and `feed:fetch` are HOST-PARAMETERIZED, so a pre-auth conveys their
+//     parameter set (hosts / compiled templates), never a bare "may fetch". The other
+//     nine are plain on/off grants. `applyPreAuth` filters the parameterized ones out
+//     of the plain-cap mint below.
+//   - M1 clamps WHO may hold a capability, not what the capability then does. A
+//     pre-granted `device:camera` still opens the device through the host's own capture
+//     surface, under the host-chrome indicator the app cannot cover (G-DEV-5); it does
+//     not hand the app a device handle.
+//   - Pre-auth is not the M3 stance. A stranger's app under M3 is refused these with no
+//     prompt at all (G-DEV-2); M1 is the path where an operator or the user has already
+//     decided, not a way around that refusal.
 //
 // The check is **all-or-nothing**: if a policy names ANY refused capability the
 // whole pre-auth is rejected and NOTHING is minted — a partial apply would

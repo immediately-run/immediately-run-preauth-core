@@ -73,10 +73,26 @@ export interface CapabilityDef {
    *  (region binding only). In core_concepts §5 terms the consent-path is the
    *  "above-the-floor, up-to-the-ceiling → first-use consent" band: an app-scoped
    *  elevated cap sits in that band for the stage principal, a non-app-scoped one
-   *  is above the stage ceiling (granted only by a slot's elevated principal). The app-scoped set is `net:fetch`, `task:invoke`,
-   *  `contribute:self` (decision #1 — its baseline→elevated reclassification landed
-   *  in R3-33d), and `diagnostics:read` (R3-74 / P3-72, D4); the durable grant
-   *  participates in the §8.15 90-day expiry like any app-scoped grant. */
+   *  is above the stage ceiling (granted only by a slot's elevated principal). The
+   *  durable grant participates in the §8.15 90-day expiry like any app-scoped grant.
+   *
+   *  **The app-scoped set, in full** — this is a security boundary, so it is stated
+   *  completely rather than by example. The authoritative form is DERIVED, never
+   *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
+   *  and `isAppScoped` is what every consumer branches on. As of registry 1.12.0 the
+   *  eleven rows carrying it are:
+   *
+   *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
+   *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
+   *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
+   *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
+   *    `device:camera` and `device:microphone` (R3-425).
+   *
+   *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
+   *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
+   *  capability: the durable authority IS their parameter set. The remaining nine are
+   *  plain on/off grants. That distinction bounds what a grant CONVEYS; it does not
+   *  narrow who may earn one, which is what `appScoped` decides. */
   appScoped?: boolean;
   /** Render this capability's consent line with the platform's **maximally-
    *  explicit** (scariest) styling, never bundled into a combined prompt
