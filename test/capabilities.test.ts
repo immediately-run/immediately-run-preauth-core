@@ -299,10 +299,12 @@ describe('device:geolocation — host-brokered position, earned by consent', () 
     expect(CAPABILITIES['device:geolocation'].parameterized).toBeUndefined();
   });
 
-  it('is known, and takes its own registry version — 1.10.0 identifies THIS vocabulary', () => {
+  it('is known, and takes its own registry version — 1.10.0 identifies THAT vocabulary', () => {
+    // The global REGISTRY_VERSION assertion lives on the NEWEST rows' test
+    // (`device:camera`/`device:microphone`, 1.11.0) — pinning it here would couple
+    // this case to every future addition.
     expect(isKnownCapability('device:geolocation')).toBe(true);
     expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
-    expect(REGISTRY_VERSION).toBe('1.10.0');
   });
 
   it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
@@ -314,10 +316,97 @@ describe('device:geolocation — host-brokered position, earned by consent', () 
     expect(unsupportedCapabilities(['device:geolocation'], REGISTRY_VERSION)).toEqual([]);
   });
 
-  it('there is exactly ONE device row — camera/microphone/clipboard are not shipped', () => {
-    // §2 proposes four; only geolocation is real. A vocabulary that pre-declares the
-    // other three would let a binding request a capability nothing enforces.
-    const deviceCaps = Object.keys(CAPABILITIES).filter((c) => c.startsWith('device:'));
-    expect(deviceCaps).toEqual(['device:geolocation']);
+  it('is unaffected by the R3-425 additions — its `since` does not move', () => {
+    // A row's `since` is the version a host must be at to enforce it. Sliding an
+    // existing row's `since` forward with each addition would make every prior host
+    // refuse bindings it can in fact serve.
+    expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
+    expect(isSupportedCapability('device:geolocation', '1.10.0')).toBe(true);
+  });
+});
+
+// ── device:camera / device:microphone — the CAPTURE devices (R3-425) ──
+// BROWSER_CAPABILITIES_SPEC §2/§3. Inside the app frame `getUserMedia` throws
+// `SecurityError: Invalid security origin`, and a `MediaStreamTrack` is not
+// transferable between windows — so the host opens the device at its own origin and
+// hands the app BYTES (the one-shot capture task) or FRAMES, never a handle.
+describe('device:camera / device:microphone — host-brokered capture, earned by consent', () => {
+  const CAPTURE = ['device:camera', 'device:microphone'] as const;
+
+  it.each(CAPTURE)('%s is an ELEVATED action, and is NOT baseline', (cap) => {
+    // Baseline would let a stranger's app open the camera with no consent line and
+    // nothing to revoke — strictly worse than the location case, because a capture
+    // catches bystanders who never chose anything.
+    expect(tierOf(cap)).toBe('elevated');
+    expect(isBaseline(cap)).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain(cap);
+  });
+
+  it.each(CAPTURE)("%s kind is 'action' — the §8.4 gate, not an §8.3 projection", (cap) => {
+    // Same reasoning as `device:geolocation`: there is no standing "camera" state to
+    // project. The value does not exist until the app asks the host to acquire it,
+    // which turns on a device. That is a host operation invoked on request.
+    expect(CAPABILITIES[cap].kind).toBe('action');
+  });
+
+  it.each(CAPTURE)('%s is app-scoped — a stage app EARNS it via the powerbox consent', (cap) => {
+    expect(isAppScoped(cap)).toBe(true);
+  });
+
+  it.each(CAPTURE)('%s is a PLAIN on/off grant — the delivery GRADE is not in the row', (cap) => {
+    // One capability per DEVICE, not one per grade. Which grade an app may have is a
+    // property of the durable grant and the consent line the user reads; splitting
+    // the vocabulary by grade would mint a name per grade and force a re-consent to
+    // add one. Keeping the grade off the row leaves the frame-stream grade additive.
+    expect(isHostParameterized(cap)).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain(cap);
+    expect(CAPABILITIES[cap].parameterized).toBeUndefined();
+  });
+
+  it.each(CAPTURE)('%s takes the same shape as device:geolocation, field for field', (cap) => {
+    // The point of the assertion: the capture rows are not a new KIND of thing. If a
+    // future change moves one of these four fields on the geolocation row, this fails
+    // and the divergence has to be argued rather than drifted into.
+    const geo = CAPABILITIES['device:geolocation'];
+    const def = CAPABILITIES[cap];
+    expect(def.kind).toBe(geo.kind);
+    expect(def.tier).toBe(geo.tier);
+    expect(def.appScoped).toBe(geo.appScoped);
+    expect(def.maximallyExplicit).toBe(geo.maximallyExplicit);
+  });
+
+  it('both are known, and share ONE registry version — 1.11.0 identifies THIS vocabulary', () => {
+    // They ship together because a host either has the capture broker AND the
+    // host-chrome indicator or it has neither; two versions would imply a host that
+    // can serve a microphone but not a camera, which no host will ever be.
+    for (const cap of CAPTURE) {
+      expect(isKnownCapability(cap)).toBe(true);
+      expect(CAPABILITIES[cap].since).toBe('1.11.0');
+    }
+    expect(REGISTRY_VERSION).toBe('1.11.0');
+  });
+
+  it('an older host REFUSES a binding that requests either rather than half-enforcing', () => {
+    // A host on 1.10.0 has the geolocation broker but no capture surface and no
+    // host-chrome indicator. Mounting a region that asked for the camera and
+    // silently never opening it — or worse, opening it with no indicator — is the
+    // outcome T26 exists to prevent.
+    for (const cap of CAPTURE) {
+      expect(isSupportedCapability(cap, '1.10.0')).toBe(false);
+      expect(isSupportedCapability(cap, '1.11.0')).toBe(true);
+      expect(unsupportedCapabilities([cap], '1.10.0')).toEqual([cap]);
+      expect(unsupportedCapabilities([cap], REGISTRY_VERSION)).toEqual([]);
+    }
+  });
+
+  it('there are exactly THREE device rows — `device:clipboard` is deliberately NOT shipped', () => {
+    // §2 proposes four. Clipboard is left out on purpose: the spec's own open
+    // question is whether WRITES belong at the stage floor while READS stay
+    // consented, and one row cannot hold two tiers. Shipping `device:clipboard` now
+    // would answer that by accident, and the name would have to be deprecated if the
+    // answer is a read/write split — expensive in a closed, versioned vocabulary.
+    const deviceCaps = Object.keys(CAPABILITIES).filter((c) => c.startsWith('device:')).sort();
+    expect(deviceCaps).toEqual(['device:camera', 'device:geolocation', 'device:microphone']);
+    expect(isKnownCapability('device:clipboard')).toBe(false);
   });
 });

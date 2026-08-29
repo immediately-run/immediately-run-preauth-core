@@ -52,6 +52,26 @@ describe('planPreAuthCapabilities (§8.9 target check)', () => {
     expect(isPreAuthClean(p)).toBe(true);
   });
 
+  it('device:camera / device:microphone are grantable — app-scoped since R3-425', () => {
+    // §8.9 accepts them on the ordinary app-scoped path, together, with no special
+    // case for "this one turns on a sensor". The powerbox consent IS this path; the
+    // extra machinery capture needs (the host-drawn surface, the chrome indicator)
+    // hangs off the HOST, not off a second admission rule here.
+    const p = planPreAuthCapabilities(['device:camera', 'device:microphone']);
+    expect(p.grantable).toEqual(['device:camera', 'device:microphone']);
+    expect(p.refused).toEqual([]);
+    expect(isPreAuthClean(p)).toBe(true);
+  });
+
+  it('device:clipboard is refused as UNKNOWN — it is not in the vocabulary', () => {
+    // The fail-closed half of leaving it out: a binding that asks for the proposed
+    // capability is refused by name rather than mounting with a clipboard that
+    // nothing enforces.
+    const p = planPreAuthCapabilities(['device:clipboard']);
+    expect(p.grantable).toEqual([]);
+    expect(p.refused).toEqual<PreAuthRefusal[]>([{ capability: 'device:clipboard', reason: 'unknown' }]);
+  });
+
   it('unknown caps are refused fail-closed', () => {
     const p = planPreAuthCapabilities(['definitely:not-a-cap']);
     expect(p.refused).toEqual<PreAuthRefusal[]>([{ capability: 'definitely:not-a-cap', reason: 'unknown' }]);
@@ -169,6 +189,23 @@ describe('applyPreAuth (M1 write path)', () => {
     expect(res.mint?.capabilitiesOk).toBe(true);
     const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
     expect((capCall.args as { capabilities: string[] }).capabilities).toEqual(['device:geolocation']);
+  });
+
+  // R3-425: the capture devices mint through the SAME plain path — durable on/off
+  // grants on (app, principal), revocable from the same surfaces. No grade is minted
+  // with them, because the grade is not in the capability.
+  it('MINTS device:camera and device:microphone as plain on/off grants', async () => {
+    const store = fakeStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['device:camera', 'device:microphone'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.refused).toEqual([]);
+    expect(res.mint?.capabilitiesOk).toBe(true);
+    const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
+    expect((capCall.args as { capabilities: string[] }).capabilities).toEqual(['device:camera', 'device:microphone']);
   });
 
   it('EXCLUDES net:fetch from the plain-cap mint (host-parameterized → hosts only, never a bare grant)', async () => {

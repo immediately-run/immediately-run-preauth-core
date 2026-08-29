@@ -54,7 +54,9 @@ export type Capability =
   | 'llm:chat'
   | 'authoring:run'
   | 'analytics:emit'
-  | 'device:geolocation';
+  | 'device:geolocation'
+  | 'device:camera'
+  | 'device:microphone';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -379,9 +381,77 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // coarse/precise split would make it parameterized; that stays an open question
   // in the spec rather than a shape guessed at here.
   'device:geolocation': { kind: 'action', tier: 'elevated', since: '1.10.0', appScoped: true },
+  // BROWSER_CAPABILITIES_SPEC §2/§3 (R3-425) — the two CAPTURE devices. They take
+  // `device:geolocation`'s shape exactly (`action` / `elevated` / `appScoped`, plain
+  // on/off), for the same reasons written out on that row, so only what is DIFFERENT
+  // about them is recorded here.
+  //
+  // The origin blocker is harsher than geolocation's, not softer: inside the app
+  // frame `getUserMedia({video})`/`({audio})` does not merely fail to prompt, it
+  // throws `SecurityError: Invalid security origin` outright (§1, measured). And the
+  // richer result cannot be handed over either — a `MediaStreamTrack` is not
+  // transferable between windows (`DataCloneError`), while `ImageBitmap`,
+  // `ArrayBuffer`, `MessagePort` and `ReadableStream` all are. So the host opens the
+  // device at its own origin and hands the app BYTES or FRAMES, never a handle.
+  //
+  // TWO THINGS FOLLOW FROM "capture", and they are the whole reason these are not
+  // just more geolocation rows:
+  //
+  //  1. A capture has a LIVE SESSION with a duration a bystander can be caught in.
+  //     While one is open the host shows a persistent indicator in its own chrome
+  //     that the stage app cannot cover or remove (G-DEV-5) — the same rule that
+  //     keeps sign-in in host chrome. A position read has no such session and needs
+  //     no such indicator.
+  //  2. The DEFAULT delivery is a one-shot capture task drawn by the HOST
+  //     (`capture-photo@1` / `capture-audio@1`): the user frames the shot, taps Done,
+  //     and the app receives bytes. The app is never in the loop while the device is
+  //     live, so "nothing is recorded when the user cancels" is a property of the
+  //     mechanism rather than a promise the app keeps.
+  //
+  // ONE capability per device, NOT one per delivery grade. The grade (one-shot bytes
+  // vs. a live frame stream) is a property of the durable grant and the consent line
+  // the user reads — never a per-call knob the app picks — which is the same rule
+  // R3-424 wrote down for accuracy. Splitting the vocabulary by grade would mint a
+  // name per grade and force a re-consent to add one; keeping the grade off the row
+  // leaves the frame-stream grade additive.
+  //
+  // `device:clipboard` is deliberately NOT here — see the note under the table.
+  'device:camera': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
+  'device:microphone': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
 };
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.10.0 with the elevated,
+// `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
+// OUT of the vocabulary by R3-425.
+//
+// Not an oversight and not "no time": the spec's own open question is *"writes may be
+// safe at the stage floor (the sandbox already allows copy via `execCommand`); reads
+// should stay consented."* That question is about the row's TIER, and a single
+// `device:clipboard` row cannot hold two tiers. Shipping one now would answer the
+// question by accident — the exact failure R3-424 avoided by keeping the
+// coarse/precise location split out of the call params.
+//
+// The vocabulary is CLOSED and VERSIONED, which makes a name expensive: if the
+// answer turns out to be "write is baseline, read is elevated", the shape is two
+// rows (`device:clipboard-read` / `device:clipboard-write`) and the single name
+// shipped today would have to be deprecated — a published name that no longer means
+// anything, in a registry whose whole value is that a version identifies a
+// vocabulary. Nothing is lost by waiting: no capability is required to decide, and
+// adding a row is additive.
+//
+// It is also outside this item. R3-425 is camera and microphone; clipboard has no
+// capture session, no host-drawn capture surface and nothing for the G-DEV-5
+// indicator to indicate, so it would arrive with none of the machinery that makes
+// the two rows above enforceable.
+
+/** The current registry/vocabulary version (§5.11). Bumped to 1.11.0 with the elevated,
+ *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
+ *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
+ *  ship together and a host either has the capture broker + the host-chrome indicator
+ *  or it has neither; a host on 1.10.0 refuses a binding that requests either (T26)
+ *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
+ *  in this version — see the note above the table.
+ *
+ *  Prior notes — bumped to 1.10.0 with the elevated,
  *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
  *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
  *  reason `feed:fetch` did: 1.9.0 is already published (0.1.15, with `editor:reveal`),
@@ -403,7 +473,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.10.0';
+export const REGISTRY_VERSION = '1.11.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
