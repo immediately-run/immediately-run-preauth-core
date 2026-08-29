@@ -187,9 +187,12 @@ describe('feed:fetch — the template-bound connector egress capability', () => 
     // different published vocabularies both answering "1.7.0", and a version that does
     // not identify a vocabulary is not much of a version gate.
     //
-    // The REGISTRY_VERSION assertion moved to the NEWEST row's test (`editor:reveal`,
-    // 1.9.0) — pinning the global here coupled this case to every future addition, so
-    // adding an unrelated capability failed a test about `feed:fetch`.
+    // The global REGISTRY_VERSION assertion does NOT live here — pinning it here
+    // coupled this case to every future addition, so adding an unrelated capability
+    // failed a test about `feed:fetch`. It sits on the NEWEST vocabulary's test, which
+    // is `auth:identity`'s reclassification (1.12.0). It has moved twice since this
+    // comment first named `editor:reveal`, which is the argument for not naming a
+    // moving target in three places: assert what THIS row owns, and nothing else.
     expect(CAPABILITIES['feed:fetch'].since).toBe('1.8.0');
     expect(CAPABILITIES['chrome:read'].since).toBe('1.7.0');
   });
@@ -291,9 +294,9 @@ describe('editor:reveal', () => {
   });
 
   it('takes its own registry version — 1.9.0 identifies THAT vocabulary', () => {
-    // The global REGISTRY_VERSION assertion lives on the NEWEST row's test
-    // (`device:geolocation`, 1.10.0) — pinning it here would couple this case to
-    // every future addition.
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test —
+    // currently `auth:identity`'s reclassification (1.12.0) — never here: pinning it
+    // on this row would couple the case to every future addition.
     expect(CAPABILITIES['editor:reveal'].since).toBe('1.9.0');
   });
 
@@ -346,9 +349,9 @@ describe('device:geolocation — host-brokered position, earned by consent', () 
   });
 
   it('is known, and takes its own registry version — 1.10.0 identifies THAT vocabulary', () => {
-    // The global REGISTRY_VERSION assertion lives on the NEWEST rows' test
-    // (`device:camera`/`device:microphone`, 1.11.0) — pinning it here would couple
-    // this case to every future addition.
+    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test —
+    // currently `auth:identity`'s reclassification (1.12.0) — never here: pinning it
+    // on this row would couple the case to every future addition.
     expect(isKnownCapability('device:geolocation')).toBe(true);
     expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
   });
