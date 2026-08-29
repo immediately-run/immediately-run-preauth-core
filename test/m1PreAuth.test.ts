@@ -42,6 +42,16 @@ describe('planPreAuthCapabilities (§8.9 target check)', () => {
     expect(isPreAuthClean(p)).toBe(true);
   });
 
+  it('device:geolocation is grantable — app-scoped since R3-424, earnable by consent', () => {
+    // §8.9 accepts it on the ordinary app-scoped path: no special case, no second
+    // gate. The BROWSER_CAPABILITIES design's "powerbox consent, persisted on
+    // (app, principal)" IS this path.
+    const p = planPreAuthCapabilities(['device:geolocation']);
+    expect(p.grantable).toEqual(['device:geolocation']);
+    expect(p.refused).toEqual([]);
+    expect(isPreAuthClean(p)).toBe(true);
+  });
+
   it('unknown caps are refused fail-closed', () => {
     const p = planPreAuthCapabilities(['definitely:not-a-cap']);
     expect(p.refused).toEqual<PreAuthRefusal[]>([{ capability: 'definitely:not-a-cap', reason: 'unknown' }]);
@@ -143,6 +153,22 @@ describe('applyPreAuth (M1 write path)', () => {
     expect(res.mint?.capabilitiesOk).toBe(true);
     const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
     expect((capCall.args as { capabilities: string[] }).capabilities).toEqual(['auth:identity']);
+  });
+
+  // R3-424: the device capability mints through the SAME plain path — a durable
+  // on/off grant on (app, principal), revocable from the same surfaces.
+  it('MINTS device:geolocation as a plain on/off grant through the one mint path', async () => {
+    const store = fakeStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['device:geolocation'],
+      mounts: [],
+      netFetchHosts: [],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.refused).toEqual([]);
+    expect(res.mint?.capabilitiesOk).toBe(true);
+    const capCall = calls.find((c) => c.method === 'grantAppCapabilities')!;
+    expect((capCall.args as { capabilities: string[] }).capabilities).toEqual(['device:geolocation']);
   });
 
   it('EXCLUDES net:fetch from the plain-cap mint (host-parameterized → hosts only, never a bare grant)', async () => {

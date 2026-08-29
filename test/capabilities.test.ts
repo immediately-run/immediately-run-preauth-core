@@ -244,9 +244,11 @@ describe('editor:reveal', () => {
     expect(CAPABILITIES['editor:open'].since).toBe('1.0.0');
   });
 
-  it('takes its own registry version — 1.9.0 identifies THIS vocabulary', () => {
+  it('takes its own registry version — 1.9.0 identifies THAT vocabulary', () => {
+    // The global REGISTRY_VERSION assertion lives on the NEWEST row's test
+    // (`device:geolocation`, 1.10.0) — pinning it here would couple this case to
+    // every future addition.
     expect(CAPABILITIES['editor:reveal'].since).toBe('1.9.0');
-    expect(REGISTRY_VERSION).toBe('1.9.0');
   });
 
   it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
@@ -257,5 +259,65 @@ describe('editor:reveal', () => {
     expect(isSupportedCapability('editor:reveal', '1.9.0')).toBe(true);
     expect(unsupportedCapabilities(['editor:reveal'], '1.8.0')).toEqual(['editor:reveal']);
     expect(unsupportedCapabilities(['editor:reveal'], REGISTRY_VERSION)).toEqual([]);
+  });
+});
+
+// ── device:geolocation — the first host-brokered device capability (R3-424) ──
+// BROWSER_CAPABILITIES_SPEC §2–§4. The host calls `navigator.geolocation` at its own
+// origin and returns coordinates; the app never touches the browser handle.
+describe('device:geolocation — host-brokered position, earned by consent', () => {
+  it('is an ELEVATED action, and is NOT baseline', () => {
+    // Baseline would hand every stage frame — including a stranger's app — the
+    // user's physical location with no consent line and nothing to revoke.
+    expect(tierOf('device:geolocation')).toBe('elevated');
+    expect(isBaseline('device:geolocation')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('device:geolocation');
+  });
+
+  it("kind is 'action' — the §8.4 gate, not an §8.3 channel projection", () => {
+    // `kind` names the enforcement point, not the English verb (the same call
+    // `diagnostics:read` made). There is no standing position state to project:
+    // the value does not exist until the app asks the host to acquire it, which
+    // turns on a sensor and can raise the browser's own prompt.
+    expect(CAPABILITIES['device:geolocation'].kind).toBe('action');
+    expect(CAPABILITIES['diagnostics:read'].kind).toBe('action');
+  });
+
+  it('is app-scoped — a stage app EARNS it via the powerbox consent', () => {
+    expect(isAppScoped('device:geolocation')).toBe(true);
+    // It joins the consentable set alongside the other app-earnable elevated caps.
+    expect(isAppScoped('llm:chat')).toBe(true);
+    expect(isAppScoped('auth:identity')).toBe(true);
+  });
+
+  it('is a PLAIN on/off grant — not host-parameterized', () => {
+    // A coarse/precise split would make the grant a parameter set (like net:fetch's
+    // host list) and exclude it from the plain-cap mint. The spec leaves that an
+    // open question, so the shape stays plain until it is decided.
+    expect(isHostParameterized('device:geolocation')).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain('device:geolocation');
+    expect(CAPABILITIES['device:geolocation'].parameterized).toBeUndefined();
+  });
+
+  it('is known, and takes its own registry version — 1.10.0 identifies THIS vocabulary', () => {
+    expect(isKnownCapability('device:geolocation')).toBe(true);
+    expect(CAPABILITIES['device:geolocation'].since).toBe('1.10.0');
+    expect(REGISTRY_VERSION).toBe('1.10.0');
+  });
+
+  it('an older host REFUSES a binding that requests it rather than half-enforcing', () => {
+    // A host on 1.9.0 has no device broker at all. Mounting a region that asked for
+    // position and silently never delivering one is the worse outcome (T26).
+    expect(isSupportedCapability('device:geolocation', '1.9.0')).toBe(false);
+    expect(isSupportedCapability('device:geolocation', '1.10.0')).toBe(true);
+    expect(unsupportedCapabilities(['device:geolocation'], '1.9.0')).toEqual(['device:geolocation']);
+    expect(unsupportedCapabilities(['device:geolocation'], REGISTRY_VERSION)).toEqual([]);
+  });
+
+  it('there is exactly ONE device row — camera/microphone/clipboard are not shipped', () => {
+    // §2 proposes four; only geolocation is real. A vocabulary that pre-declares the
+    // other three would let a binding request a capability nothing enforces.
+    const deviceCaps = Object.keys(CAPABILITIES).filter((c) => c.startsWith('device:'));
+    expect(deviceCaps).toEqual(['device:geolocation']);
   });
 });

@@ -53,7 +53,8 @@ export type Capability =
   | 'diagnostics:read'
   | 'llm:chat'
   | 'authoring:run'
-  | 'analytics:emit';
+  | 'analytics:emit'
+  | 'device:geolocation';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -349,9 +350,46 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // platform behavior may depend on an app consuming this channel, so an app that
   // never reads it is indistinguishable from one that does.
   'chrome:read': { kind: 'read', tier: 'baseline', since: '1.7.0' },
+  // BROWSER_CAPABILITIES_SPEC §2–§4 (R3-424) — the first `device:*` row: the HOST
+  // calls `navigator.geolocation` at ITS OWN origin and hands the app coordinates.
+  // It exists because the blocker is the ORIGIN, not policy: an app frame is
+  // opaque-origin, browsers key permission grants on an origin, and
+  // `getCurrentPosition` inside the frame never prompts — it just times out
+  // (`code=3`). Widening the sandbox with `allow-same-origin` is off the table
+  // (UI_AS_APPS G1/T1), so this follows the `net:fetch` shape: the app never gets
+  // the browser handle, the host performs the privileged call and returns a
+  // serialized result.
+  //
+  // **kind: 'action', not 'read'** — deliberately, and the same call the
+  // `diagnostics:read` row made. `kind` names the ENFORCEMENT POINT, not the
+  // English verb (see this file's header): a `read` is gated by a `view()`
+  // projection on a channel the host is already maintaining (§8.3), an `action` is
+  // gated before a handler runs (§8.4). There is no standing "position" state to
+  // project — the value does not exist until the app asks the host to acquire it,
+  // which turns on a sensor and (on first use per device) raises the browser's own
+  // prompt. That is a host operation invoked on request, so §8.4 is the chokepoint
+  // and `action` is what routes it there.
+  //
+  // **Elevated + appScoped**: above the stage floor and within the stage ceiling —
+  // first use shows the powerbox consent naming the app and the device, the grant
+  // persists on `(app, principal)` and is revocable from the same surfaces as a
+  // space grant. Above the M3 ceiling: the M3 stance delegates nothing, so a
+  // stranger's app is refused with no prompt at all (G-DEV-2). NOT parameterized:
+  // the grant is a plain on/off, so it mints through the plain-cap path. A
+  // coarse/precise split would make it parameterized; that stays an open question
+  // in the spec rather than a shape guessed at here.
+  'device:geolocation': { kind: 'action', tier: 'elevated', since: '1.10.0', appScoped: true },
 };
 
-/** The current registry/vocabulary version (§5.11). Bumped to 1.8.0 with the elevated,
+/** The current registry/vocabulary version (§5.11). Bumped to 1.10.0 with the elevated,
+ *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
+ *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
+ *  reason `feed:fetch` did: 1.9.0 is already published (0.1.15, with `editor:reveal`),
+ *  and a registry version that does not identify a vocabulary is not much of a version
+ *  gate. A host older than 1.10.0 refuses a binding that requests `device:geolocation`
+ *  (T26) rather than mounting with the sensor silently inert.
+ *
+ *  Prior notes — bumped to 1.8.0 with the elevated,
  *  app-scoped, host-parameterized `feed:fetch` (`CONNECTOR_EGRESS_FIXING_SPEC` §2 —
  *  R3-227), mirroring capabilities.json. (1.7.0 added the baseline state read
  *  `chrome:read`; 1.6.0 added `analytics:emit`; 1.5.0 added the first-party-only
@@ -365,7 +403,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.9.0';
+export const REGISTRY_VERSION = '1.10.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
