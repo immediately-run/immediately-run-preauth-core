@@ -386,6 +386,12 @@ exports.CAPABILITIES = {
     // `device:clipboard` is deliberately NOT here — see the note under the table.
     'device:camera': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
     'device:microphone': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
+    // R3-485 (OSO §4.3, R-OSO-20/21/22): the recents record is HOST-owned (the
+    // dominant arrival path is a direct URL only the host observes), and page.home
+    // reads it through this one elevated, app-scoped capability. It confers no
+    // authority: an entry is a location, and opening it runs the ordinary load path
+    // with the ordinary consent. Coordinates only — never in-repo paths.
+    'recents:read': { kind: 'read', tier: 'elevated', since: '1.13.0', appScoped: true },
 };
 // `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
 // OUT of the vocabulary by R3-425.
@@ -469,7 +475,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.12.0';
+exports.REGISTRY_VERSION = '1.13.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);

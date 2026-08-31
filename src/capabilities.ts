@@ -56,7 +56,10 @@ export type Capability =
   | 'analytics:emit'
   | 'device:geolocation'
   | 'device:camera'
-  | 'device:microphone';
+  | 'device:microphone'
+  // R3-485 (OSO §4.3 R-OSO-20): the ONE capability the out-of-session spec adds —
+  // the elevated, app-scoped read of the host-owned recent-projects record.
+  | 'recents:read';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -79,14 +82,14 @@ export interface CapabilityDef {
    *  **The app-scoped set, in full** — this is a security boundary, so it is stated
    *  completely rather than by example. The authoritative form is DERIVED, never
    *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-   *  and `isAppScoped` is what every consumer branches on. As of registry 1.12.0 the
-   *  eleven rows carrying it are:
+   *  and `isAppScoped` is what every consumer branches on. As of registry 1.13.0 the
+   *  twelve rows carrying it are:
    *
    *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
    *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
    *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
    *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
-   *    `device:camera` and `device:microphone` (R3-425).
+   *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485).
    *
    *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
    *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
@@ -472,6 +475,12 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // `device:clipboard` is deliberately NOT here — see the note under the table.
   'device:camera': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
   'device:microphone': { kind: 'action', tier: 'elevated', since: '1.11.0', appScoped: true },
+  // R3-485 (OSO §4.3, R-OSO-20/21/22): the recents record is HOST-owned (the
+  // dominant arrival path is a direct URL only the host observes), and page.home
+  // reads it through this one elevated, app-scoped capability. It confers no
+  // authority: an entry is a location, and opening it runs the ordinary load path
+  // with the ordinary consent. Coordinates only — never in-repo paths.
+  'recents:read': { kind: 'read', tier: 'elevated', since: '1.13.0', appScoped: true },
 };
 
 // `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
@@ -558,7 +567,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.12.0';
+export const REGISTRY_VERSION = '1.13.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
