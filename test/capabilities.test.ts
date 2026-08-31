@@ -252,10 +252,8 @@ describe('auth:identity — the reclassification takes a registry version (R3-40
     // host must be at 1.12.0 to serve is the app-scoped, consent-earnable one.
     expect(CAPABILITIES['auth:identity'].since).toBe('1.12.0');
     expect(isAppScoped('auth:identity')).toBe(true);
-    // The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's test,
-    // which is this one — pinning it on an older row's case would couple that case to
-    // every future addition.
-    expect(REGISTRY_VERSION).toBe('1.12.0');
+    // (The global REGISTRY_VERSION assertion lives on the NEWEST vocabulary's
+    // test — now the recents:read case below — per this test's own comment.)
   });
 
   it('a host on the PRE-reclassification vocabulary is REFUSED, not silently drained', () => {
@@ -460,5 +458,31 @@ describe('device:camera / device:microphone — host-brokered capture, earned by
     const deviceCaps = Object.keys(CAPABILITIES).filter((c) => c.startsWith('device:')).sort();
     expect(deviceCaps).toEqual(['device:camera', 'device:geolocation', 'device:microphone']);
     expect(isKnownCapability('device:clipboard')).toBe(false);
+  });
+});
+
+// R3-485 (OSO §4.3 R-OSO-20): the one capability the out-of-session spec adds.
+describe('recents:read — the elevated, app-scoped recents read (R3-485)', () => {
+  it('is an elevated, APP-SCOPED read named by this registry version', () => {
+    // The read is granted per (app, principal) like every durable grant — a fork
+    // of Home does not inherit it, and no other app may declare it meaningfully
+    // (the host gate additionally binds the read to the page.home binding).
+    expect(CAPABILITIES['recents:read']).toEqual({
+      kind: 'read',
+      tier: 'elevated',
+      since: '1.13.0',
+      appScoped: true,
+    });
+    expect(isAppScoped('recents:read')).toBe(true);
+    expect(isKnownCapability('recents:read')).toBe(true);
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.13.0');
+  });
+
+  it('a host on a PRE-recents vocabulary is refused, not silently drained (the version gate)', () => {
+    // The same boundary discipline as every addition: an older host that has
+    // never heard of the name must say so, not grant or drain it.
+    expect(isSupportedCapability('recents:read', '1.12.0')).toBe(false);
+    expect(isSupportedCapability('recents:read', '1.13.0')).toBe(true);
   });
 });

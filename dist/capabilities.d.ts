@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone' | 'recents:read';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -22,14 +22,14 @@ export interface CapabilityDef {
      *  **The app-scoped set, in full** — this is a security boundary, so it is stated
      *  completely rather than by example. The authoritative form is DERIVED, never
      *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-     *  and `isAppScoped` is what every consumer branches on. As of registry 1.12.0 the
-     *  eleven rows carrying it are:
+     *  and `isAppScoped` is what every consumer branches on. As of registry 1.13.0 the
+     *  twelve rows carrying it are:
      *
      *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
      *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
      *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
      *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
-     *    `device:camera` and `device:microphone` (R3-425).
+     *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485).
      *
      *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
      *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
@@ -93,7 +93,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export declare const REGISTRY_VERSION = "1.12.0";
+export declare const REGISTRY_VERSION = "1.13.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;
