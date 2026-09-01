@@ -497,8 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.14.0');
+    // The global pin moved on to the NEWEST row (theme:sources, 1.15.0) — the
+    // workspace row's own `since` is unchanged.
+    expect(REGISTRY_VERSION).toBe('1.15.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -535,5 +536,49 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     // channel, and a panel cannot tell a silent host from one reporting "no session".
     expect(isSupportedCapability('workspace:read', '1.13.0')).toBe(false);
     expect(isSupportedCapability('workspace:read', '1.14.0')).toBe(true);
+  });
+});
+
+// R3-500 (HOST_THEMING_SPEC §9.3): the registry verbs, split from `theme:set`.
+describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
+  it('is an ELEVATED action, separate from `theme:set`', () => {
+    expect(CAPABILITIES['theme:sources']).toEqual({
+      kind: 'action',
+      tier: 'elevated',
+      since: '1.15.0',
+    });
+    expect(tierOf('theme:sources')).toBe('elevated');
+    expect(isBaseline('theme:sources')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.15.0');
+  });
+
+  it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
+    // §9.3: add-source accepts only a location the host journal saw a recent
+    // open-bundle invocation of THAT app return. A lazy first-use grant would let
+    // the consent copy launder an arbitrary-fetch surface, so the capability is
+    // region-binding-only and the machine-checked pick-is-the-consent property is
+    // preserved.
+    expect(isAppScoped('theme:sources')).toBe(false);
+    expect(APP_SCOPED_CAPABILITIES).not.toContain('theme:sources');
+    expect(CAPABILITIES['theme:sources'].parameterized).toBeUndefined();
+  });
+
+  it('keeps `theme:set` selection-only honest — the split is the point', () => {
+    // The §9.3 split: `theme:set` stays "change the site's appearance" (blast
+    // radius of one bit), `theme:sources` names the real power ("read repositories
+    // and spaces you pick in the theme picker"). Two names, two grants.
+    expect(CAPABILITIES['theme:set'].kind).toBe('action');
+    expect(tierOf('theme:set')).toBe('elevated');
+    expect(isKnownCapability('theme:sources')).toBe(true);
+    expect('theme:sources' in CAPABILITIES).toBe(true);
+  });
+
+  it('a host on a PRE-theme:sources vocabulary is refused, not silently drained', () => {
+    // T26: an older host cannot enforce the §9.3 provenance rule on add-source,
+    // so a binding that requests it must not mount with the verbs silently inert.
+    expect(isSupportedCapability('theme:sources', '1.14.0')).toBe(false);
+    expect(isSupportedCapability('theme:sources', '1.15.0')).toBe(true);
   });
 });

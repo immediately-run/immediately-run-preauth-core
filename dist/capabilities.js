@@ -21,6 +21,14 @@ exports.unsupportedCapabilities = unsupportedCapabilities;
 exports.CAPABILITIES = {
     'theme:read': { kind: 'read', tier: 'baseline', since: '1.0.0' },
     'theme:set': { kind: 'action', tier: 'elevated', since: '1.0.0' },
+    // R3-500 (HOST_THEMING_SPEC §9.3): `protocol-theme {add-source, remove-source}`.
+    // Elevated ACTION (not baseline — adopting a theme READS a picked repo/space);
+    // NOT app-scoped — the theme switcher is a region-bound system app, and the
+    // §9.3 picker-provenance rule (only a location the host journal saw a recent
+    // open-bundle invocation of THAT app return) is the consent mechanism, so a
+    // lazy first-use grant would defeat the machine-checked "the pick is the
+    // consent" property.
+    'theme:sources': { kind: 'action', tier: 'elevated', since: '1.15.0' },
     'auth:status': { kind: 'read', tier: 'baseline', since: '1.0.0' },
     // R3-407: elevated read, app-scoped — a stage app EARNS the user's login/avatar
     // through the ordinary declared-capability consent path ('See your account'),
@@ -474,6 +482,16 @@ exports.CAPABILITIES = {
  *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
  *  in this version — see the note above the table.
  *
+ *  Prior notes — bumped to 1.15.0 with the ELEVATED `theme:sources`
+ *  (`HOST_THEMING_SPEC` §9.3 — R3-500): the `protocol-theme {add-source,
+ *  remove-source}` registry verbs, split out of `theme:set` so the consent copy of
+ *  each stays honest. It takes its own version for the settled reason: 1.14.0 is
+ *  already published (**0.1.19**, with `workspace:read`), and a registry version that
+ *  does not identify a vocabulary is not much of a version gate. The T26 refusal is
+ *  the RIGHT outcome here too — a host older than 1.15.0 cannot enforce the §9.3
+ *  picker-provenance rule on `add-source`, so a binding that requests it would mount
+ *  with the registry verbs silently inert.
+ *
  *  Prior notes — bumped to 1.14.0 with the BASELINE `workspace:read`
  *  (`UI_AS_APPS_SPEC` §5.15 — R3-491). It takes its own version for the settled reason:
  *  1.13.0 is already published (**0.1.18**, with `recents:read`), and a registry version
@@ -506,7 +524,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.14.0';
+exports.REGISTRY_VERSION = '1.15.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
