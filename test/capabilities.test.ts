@@ -2,6 +2,7 @@ import {
   CAPABILITIES,
   REGISTRY_VERSION,
   BASELINE_CAPABILITIES,
+  APP_SCOPED_CAPABILITIES,
   HOST_PARAMETERIZED_CAPABILITIES,
   isKnownCapability,
   isBaseline,
@@ -475,8 +476,6 @@ describe('recents:read — the elevated, app-scoped recents read (R3-485)', () =
     });
     expect(isAppScoped('recents:read')).toBe(true);
     expect(isKnownCapability('recents:read')).toBe(true);
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.13.0');
   });
 
   it('a host on a PRE-recents vocabulary is refused, not silently drained (the version gate)', () => {
@@ -484,5 +483,57 @@ describe('recents:read — the elevated, app-scoped recents read (R3-485)', () =
     // never heard of the name must say so, not grant or drain it.
     expect(isSupportedCapability('recents:read', '1.12.0')).toBe(false);
     expect(isSupportedCapability('recents:read', '1.13.0')).toBe(true);
+  });
+});
+
+// R3-491 (UI_AS_APPS_SPEC §5.15, R-UAA-15): which project the editing session is on.
+describe('workspace:read — the baseline workspace-identity read (R3-491)', () => {
+  it('is a BASELINE read, alongside the other host-state reads', () => {
+    expect(CAPABILITIES['workspace:read']).toEqual({
+      kind: 'read',
+      tier: 'baseline',
+      since: '1.14.0',
+    });
+    expect(tierOf('workspace:read')).toBe('baseline');
+    expect(isBaseline('workspace:read')).toBe(true);
+    expect(BASELINE_CAPABILITIES).toContain('workspace:read');
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.14.0');
+  });
+
+  it('is baseline because the SAME coordinates already ride `route:read`', () => {
+    // This is the whole argument, pinned so a later reader cannot mistake it for a
+    // disclosure decision: `urlchange` carries the session URL to the previewed,
+    // UNTRUSTED stage app under baseline `route:read`, and provider/namespace/
+    // repository/ref are read straight off it. A self-routed panel never receives
+    // that message — a transport gap, not an authority question. If `route:read`
+    // ever stops being baseline, this row's rationale goes with it.
+    expect(tierOf('route:read')).toBe('baseline');
+    expect(isBaseline('route:read')).toBe(true);
+  });
+
+  it('confers no ability to NAVIGATE — there is no set counterpart at any tier', () => {
+    // Observing which project is loaded must not become a way to change it:
+    // navigation stays a host action under the ordinary consent.
+    expect(CAPABILITIES['workspace:read'].kind).toBe('read');
+    expect(isKnownCapability('workspace:set')).toBe(false);
+    expect(isKnownCapability('workspace:write')).toBe(false);
+    expect(isKnownCapability('workspace:open')).toBe(false);
+  });
+
+  it('is NOT app-scoped and not parameterized — one fact about the session', () => {
+    // There is no per-app dimension to "which project is loaded": it is identical
+    // for every frame in the session, so a per-(app, principal) grant would be a
+    // lie about what is being scoped.
+    expect(isAppScoped('workspace:read')).toBe(false);
+    expect(APP_SCOPED_CAPABILITIES).not.toContain('workspace:read');
+    expect(CAPABILITIES['workspace:read'].parameterized).toBeUndefined();
+  });
+
+  it('a host on a PRE-workspace vocabulary is refused, not silently drained', () => {
+    // T26: the refusal is the RIGHT outcome — an older host publishes no workspace
+    // channel, and a panel cannot tell a silent host from one reporting "no session".
+    expect(isSupportedCapability('workspace:read', '1.13.0')).toBe(false);
+    expect(isSupportedCapability('workspace:read', '1.14.0')).toBe(true);
   });
 });
