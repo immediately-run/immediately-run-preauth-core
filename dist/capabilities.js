@@ -320,6 +320,29 @@ exports.CAPABILITIES = {
     // platform behavior may depend on an app consuming this channel, so an app that
     // never reads it is indistinguishable from one that does.
     'chrome:read': { kind: 'read', tier: 'baseline', since: '1.7.0' },
+    // UI_AS_APPS_SPEC §5.15 (R-UAA-15, R3-491) — which project the editing session is
+    // on: `{ provider, namespace, repository, ref, label }`, or `null` when there is no
+    // session (a standalone full-tab route, a task overlay).
+    //
+    // **BASELINE, and this is a transport fix rather than a disclosure decision.** The
+    // very same coordinates already reach the previewed, UNTRUSTED stage app on the
+    // baseline `route:read` channel: `urlchange` carries the session URL, from which
+    // provider/namespace/repository/ref are read off directly. The host says so
+    // outright — the elevated `editor:read` channel is scoped to what `urlchange` does
+    // NOT already expose, expressly rather than re-classifying the route as
+    // confidential. So this capability discloses nothing new; it exists because a
+    // SELF-ROUTED panel (`drivesHostRoute = false`) keeps its own route and never
+    // receives `urlchange`, and therefore cannot read a fact it is already entitled to.
+    //
+    // It is NOT app-scoped: there is no per-app dimension to "which project is loaded"
+    // — it is one fact about the session, identical for every frame in it. And there is
+    // no `workspace:set` counterpart (navigation stays a host action under the ordinary
+    // consent), so observing it cannot become an authority-escalation path.
+    //
+    // Consumers MUST NOT assume `namespace` is a GitHub owner: a `local` session is
+    // well-formed but not GitHub-shaped (`/edit/local/<project>-<hash8>/<project>/live`
+    // reads back as `my-app-3fa9c2d1/my-app`).
+    'workspace:read': { kind: 'read', tier: 'baseline', since: '1.14.0' },
     // BROWSER_CAPABILITIES_SPEC §2–§4 (R3-424) — the first `device:*` row: the HOST
     // calls `navigator.geolocation` at ITS OWN origin and hands the app coordinates.
     // It exists because the blocker is the ORIGIN, not policy: an app frame is
@@ -451,6 +474,14 @@ exports.CAPABILITIES = {
  *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
  *  in this version — see the note above the table.
  *
+ *  Prior notes — bumped to 1.14.0 with the BASELINE `workspace:read`
+ *  (`UI_AS_APPS_SPEC` §5.15 — R3-491). It takes its own version for the settled reason:
+ *  1.13.0 is already published (**0.1.18**, with `recents:read`), and a registry version
+ *  that does not identify a vocabulary is not much of a version gate. The T26 refusal is
+ *  the RIGHT outcome here too — a host older than 1.14.0 publishes no workspace channel,
+ *  so a binding that requests the capability would mount with the read permanently
+ *  silent, and a panel cannot tell a silent host from one reporting "no session".
+ *
  *  Prior notes — bumped to 1.10.0 with the elevated,
  *  app-scoped `device:geolocation` — the first host-brokered `device:*` row
  *  (`BROWSER_CAPABILITIES_SPEC` §2–§4, R3-424). It takes its own version for the same
@@ -475,7 +506,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.13.0';
+exports.REGISTRY_VERSION = '1.14.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
