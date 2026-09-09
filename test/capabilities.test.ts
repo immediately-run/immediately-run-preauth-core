@@ -497,9 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin moved on to the NEWEST row (theme:sources, 1.15.0) — the
+    // The global pin moved on to the NEWEST row (storage:local, 1.16.0) — the
     // workspace row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.15.0');
+    expect(REGISTRY_VERSION).toBe('1.16.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -550,8 +550,9 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     expect(tierOf('theme:sources')).toBe('elevated');
     expect(isBaseline('theme:sources')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.15.0');
+    // The global pin moved on to the NEWEST row (storage:local, 1.16.0) — the
+    // theme:sources row's own `since` is unchanged.
+    expect(REGISTRY_VERSION).toBe('1.16.0');
   });
 
   it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
@@ -580,5 +581,47 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     // so a binding that requests it must not mount with the verbs silently inert.
     expect(isSupportedCapability('theme:sources', '1.14.0')).toBe(false);
     expect(isSupportedCapability('theme:sources', '1.15.0')).toBe(true);
+  });
+});
+
+// R3-558 (FILESYSTEM_SPEC §2.8, R-FS-LOCAL-3): the device-local per-app store.
+describe('storage:local — the baseline device-local store open verb (R3-558)', () => {
+  it('is a BASELINE action, alongside settings:app', () => {
+    expect(CAPABILITIES['storage:local']).toEqual({
+      kind: 'action',
+      tier: 'baseline',
+      since: '1.16.0',
+    });
+    expect(tierOf('storage:local')).toBe('baseline');
+    expect(isBaseline('storage:local')).toBe(true);
+    expect(BASELINE_CAPABILITIES).toContain('storage:local');
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.16.0');
+  });
+
+  it('is NOT app-scoped and not parameterized — an app can only open its own', () => {
+    // The host derives the appKey from the frame (the T42 rule protocol-settings.open
+    // already follows), so there is no `openOf` sibling and no argument set to bound:
+    // `storage:local` conveys "open MY device-local store", never another app's.
+    expect(isAppScoped('storage:local')).toBe(false);
+    expect(APP_SCOPED_CAPABILITIES).not.toContain('storage:local');
+    expect(CAPABILITIES['storage:local'].parameterized).toBeUndefined();
+  });
+
+  it('grants no reach outside the store — baseline is a floor, not a blank check', () => {
+    // A private, device-local, quota-bounded, never-synced sandbox is deliberately
+    // at the baseline floor (R-FS-LOCAL-3): prompting for it would train the consent
+    // surface to be ignored. The boundary is the store itself — isolation is
+    // per-appKey, evictable under storage pressure, and no durability promise.
+    expect(isKnownCapability('storage:local')).toBe(true);
+    expect('storage:local' in CAPABILITIES).toBe(true);
+    expect(tierOf('storage:local')).toBe('baseline');
+  });
+
+  it('a host on a PRE-storage:local vocabulary is refused, not silently drained', () => {
+    // T26: an older host has no `localstore:` resolver, so a binding that requests
+    // the capability must not mount with the device-local store silently absent.
+    expect(isSupportedCapability('storage:local', '1.15.0')).toBe(false);
+    expect(isSupportedCapability('storage:local', '1.16.0')).toBe(true);
   });
 });
