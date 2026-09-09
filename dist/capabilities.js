@@ -111,6 +111,16 @@ exports.CAPABILITIES = {
     // first-party-only: cross-app config is an activity oracle (like a future
     // `mounts:registry`), so a fork/preview can never hold it.
     'settings:all': { kind: 'action', tier: 'first-party-only', since: '1.2.0' },
+    // Device-local per-app store (FILESYSTEM_SPEC §2.8, R3-558) — the `localstore:`
+    // scheme's open verb. Baseline, at the floor alongside `settings:app`: an app
+    // writing to a private, device-local, quota-bounded sandbox of its own is not an
+    // authority a user can meaningfully be asked about, and prompting would train the
+    // consent surface to be ignored (never ask an unanswerable question). Isolation is
+    // the store itself (storeName derived from appKey) — per device, never synced,
+    // evictable under storage pressure, and no reach outside the store nor to another
+    // app's. The open verb takes the appKey from the frame, never the argument (the
+    // same T42 rule `protocol-settings.open` follows), so there is no `openOf` sibling.
+    'storage:local': { kind: 'action', tier: 'baseline', since: '1.16.0' },
     'contribute:self': { kind: 'action', tier: 'elevated', since: '1.0.0', appScoped: true },
     'contribute:any': { kind: 'action', tier: 'elevated', since: '1.0.0', parameterized: true },
     // Decision #2 (R3-33d, landed): contribute:direct is the platform's scariest
@@ -482,6 +492,15 @@ exports.CAPABILITIES = {
  *  rather than mounting with a camera that can never open. `device:clipboard` is NOT
  *  in this version — see the note above the table.
  *
+ *  Prior notes — bumped to 1.16.0 with the BASELINE `storage:local`
+ *  (`FILESYSTEM_SPEC` §2.8 — R3-558): the device-local per-app store's open verb
+ *  (`protocol-localstore.open`). It takes its own version for the settled reason:
+ *  1.15.0 is already published (**0.1.21**, with `theme:sources`), and a registry
+ *  version that does not identify a vocabulary is not much of a version gate. The
+ *  T26 refusal is the RIGHT outcome here too — a host older than 1.16.0 has no
+ *  `localstore:` resolver, so a binding that requests the capability would mount
+ *  with the device-local store silently absent.
+ *
  *  Prior notes — bumped to 1.15.0 with the ELEVATED `theme:sources`
  *  (`HOST_THEMING_SPEC` §9.3 — R3-500): the `protocol-theme {add-source,
  *  remove-source}` registry verbs, split out of `theme:set` so the consent copy of
@@ -524,7 +543,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.15.0';
+exports.REGISTRY_VERSION = '1.16.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
