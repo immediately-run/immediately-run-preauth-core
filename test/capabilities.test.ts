@@ -497,9 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin moved on to the NEWEST row (storage:local, 1.16.0) — the
+    // The global pin moved on to the NEWEST row (link:open, 1.17.0) — the
     // workspace row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.16.0');
+    expect(REGISTRY_VERSION).toBe('1.17.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -550,9 +550,9 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     expect(tierOf('theme:sources')).toBe('elevated');
     expect(isBaseline('theme:sources')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
-    // The global pin moved on to the NEWEST row (storage:local, 1.16.0) — the
+    // The global pin moved on to the NEWEST row (link:open, 1.17.0) — the
     // theme:sources row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.16.0');
+    expect(REGISTRY_VERSION).toBe('1.17.0');
   });
 
   it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
@@ -595,8 +595,8 @@ describe('storage:local — the baseline device-local store open verb (R3-558)',
     expect(tierOf('storage:local')).toBe('baseline');
     expect(isBaseline('storage:local')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('storage:local');
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.16.0');
+    // The global pin moved on to the NEWEST row (link:open, 1.17.0).
+    expect(REGISTRY_VERSION).toBe('1.17.0');
   });
 
   it('is NOT app-scoped and not parameterized — an app can only open its own', () => {
@@ -623,5 +623,52 @@ describe('storage:local — the baseline device-local store open verb (R3-558)',
     // the capability must not mount with the device-local store silently absent.
     expect(isSupportedCapability('storage:local', '1.15.0')).toBe(false);
     expect(isSupportedCapability('storage:local', '1.16.0')).toBe(true);
+  });
+});
+
+// R3-619 (UI_AS_APPS_SPEC D-UAA-13): the host-brokered outward-link affordance.
+describe('link:open — the baseline outward-link action (R3-619)', () => {
+  it('is a BASELINE action marked maximally-explicit', () => {
+    expect(CAPABILITIES['link:open']).toEqual({
+      kind: 'action',
+      tier: 'baseline',
+      since: '1.17.0',
+      maximallyExplicit: true,
+    });
+    expect(tierOf('link:open')).toBe('baseline');
+    expect(isBaseline('link:open')).toBe(true);
+    expect(BASELINE_CAPABILITIES).toContain('link:open');
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.17.0');
+  });
+
+  it('is baseline because linker outward is ordinary — the PER-CALL confirmation is the protection', () => {
+    // A stage app sending the user to an external destination is the floor, so no
+    // durable grant and no consent screen. What keeps it from being a phishing
+    // primitive is the handler: the host validates the URL and confirms every open
+    // against the full destination. That confirmation is `maximallyExplicit`, which
+    // is why even a baseline row carries the flag.
+    expect(isAppScoped('link:open')).toBe(false);
+    expect(APP_SCOPED_CAPABILITIES).not.toContain('link:open');
+    expect(CAPABILITIES['link:open'].parameterized).toBeUndefined();
+    expect(CAPABILITIES['link:open'].maximallyExplicit).toBe(true);
+  });
+
+  it('is not route:read — widening `route:read` would silently widen openRepository too', () => {
+    // `route:read` means "a platform route"; `link:open` names an arbitrary external
+    // URL. They are different authority and must stay different capabilities: the
+    // host builds a platform route for openRepository, but for link:open the app
+    // supplies the destination, which is exactly why this one confirms every call.
+    expect(tierOf('route:read')).toBe('baseline');
+    expect(CAPABILITIES['route:read'].kind).toBe('read');
+    expect(CAPABILITIES['link:open'].kind).toBe('action');
+  });
+
+  it('a host on a PRE-link:open vocabulary is refused, not silently drained', () => {
+    // T26: an older host has no `protocol-openlink` gate row, so a binding that
+    // requests the capability must be refused rather than mounting with the action
+    // answering `forbidden` forever.
+    expect(isSupportedCapability('link:open', '1.16.0')).toBe(false);
+    expect(isSupportedCapability('link:open', '1.17.0')).toBe(true);
   });
 });

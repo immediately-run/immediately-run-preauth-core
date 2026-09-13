@@ -74,7 +74,13 @@ export type Capability =
   // open verb (`protocol-localstore.open`). Baseline — a private, per-device,
   // quota-bounded sandbox of the app's own is not an authority a user can be asked
   // about, so no consent, and it grants no reach outside the store.
-  | 'storage:local';
+  | 'storage:local'
+  // R3-619 (BUNDLE_EMBEDDING_SPEC OQ15 / UI_AS_APPS_SPEC D-UAA-13): ask the host to
+  // open an outward link in a new tab. Baseline ACTION — a stage app linking outward
+  // is ordinary — but the destination is arbitrary, so the handler confirms every
+  // call (the full URL in host chrome, opened only on the user's click) and the row
+  // is marked `maximallyExplicit` even at baseline. See the table entry.
+  | 'link:open';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -537,6 +543,20 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // authority: an entry is a location, and opening it runs the ordinary load path
   // with the ordinary consent. Coordinates only — never in-repo paths.
   'recents:read': { kind: 'read', tier: 'elevated', since: '1.13.0', appScoped: true },
+  // R3-619 (UI_AS_APPS_SPEC D-UAA-13): the host-brokered outward-link affordance.
+  // `link:open` lets an app ask the host to open an arbitrary external URL in a new
+  // tab, because a `window.open` from inside the sandboxed frame inherits the
+  // sandbox's opaque origin and sign-in-gated destinations fail as themselves.
+  //
+  // BASELINE, deliberately: a stage app linking outward is ordinary, and the real
+  // protection is not a tier but the per-call confirmation the handler owns — the
+  // host validates the URL (`https:` only, no credentials, length cap, not its own
+  // origin), renders the FULL destination in its own chrome, and opens only on the
+  // user's click (security-projections R-SP-2/R-SP-3). Without that confirmation
+  // `link:open` is a phishing primitive, which is why the row is marked
+  // `maximallyExplicit: true` even at the baseline tier: the one consent moment this
+  // capability ever produces must be the scariest styling, never a bundled prompt.
+  'link:open': { kind: 'action', tier: 'baseline', since: '1.17.0', maximallyExplicit: true },
 };
 
 // `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
@@ -649,8 +669,16 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  registry version that does not identify a vocabulary is not much of a version gate.
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
- *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.16.0';
+ *  enforce target-fixing must not run a connector that assumes it.
+ *
+ *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
+ *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
+ *  It takes its own version for the settled reason: 1.16.0 is already published
+ *  (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
+ *  `protocol-openlink` gate row, so a binding that requests the capability would
+ *  mount with the action refusing to `forbidden` rather than opening a confirmed
+ *  tab — the T26 refusal is the right outcome. */
+export const REGISTRY_VERSION = '1.17.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
