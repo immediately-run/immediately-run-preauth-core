@@ -61,6 +61,14 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
  *
+ *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
+ *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
+ *  It takes its own version for the settled reason: 1.16.0 is already published
+ *  (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
+ *  `protocol-openlink` gate row, so a binding that requests the capability would
+ *  mount with the action refusing to `forbidden` rather than opening a confirmed
+ *  tab — the T26 refusal is the right outcome.
+ *
  *  Prior notes — bumped to 1.11.0 with the elevated,
  *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
  *  (`BROWSER_CAPABILITIES_SPEC` §2/§3, R3-425). They share one version because they
@@ -119,15 +127,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  registry version that does not identify a vocabulary is not much of a version gate.
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
- *  enforce target-fixing must not run a connector that assumes it.
- *
- *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
- *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
- *  It takes its own version for the settled reason: 1.16.0 is already published
- *  (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
- *  `protocol-openlink` gate row, so a binding that requests the capability would
- *  mount with the action refusing to `forbidden` rather than opening a confirmed
- *  tab — the T26 refusal is the right outcome. */
+ *  enforce target-fixing must not run a connector that assumes it. */
 export declare const REGISTRY_VERSION = "1.17.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;

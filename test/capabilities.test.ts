@@ -642,7 +642,7 @@ describe('link:open — the baseline outward-link action (R3-619)', () => {
     expect(REGISTRY_VERSION).toBe('1.17.0');
   });
 
-  it('is baseline because linker outward is ordinary — the PER-CALL confirmation is the protection', () => {
+  it('is baseline because linking outward is ordinary — the PER-CALL confirmation is the protection', () => {
     // A stage app sending the user to an external destination is the floor, so no
     // durable grant and no consent screen. What keeps it from being a phishing
     // primitive is the handler: the host validates the URL and confirms every open
