@@ -497,9 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin moved on to the NEWEST row (link:open, 1.17.0) — the
+    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0) — the
     // workspace row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.17.0');
+    expect(REGISTRY_VERSION).toBe('1.18.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -550,9 +550,9 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     expect(tierOf('theme:sources')).toBe('elevated');
     expect(isBaseline('theme:sources')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
-    // The global pin moved on to the NEWEST row (link:open, 1.17.0) — the
+    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0) — the
     // theme:sources row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.17.0');
+    expect(REGISTRY_VERSION).toBe('1.18.0');
   });
 
   it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
@@ -595,8 +595,8 @@ describe('storage:local — the baseline device-local store open verb (R3-558)',
     expect(tierOf('storage:local')).toBe('baseline');
     expect(isBaseline('storage:local')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('storage:local');
-    // The global pin moved on to the NEWEST row (link:open, 1.17.0).
-    expect(REGISTRY_VERSION).toBe('1.17.0');
+    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0).
+    expect(REGISTRY_VERSION).toBe('1.18.0');
   });
 
   it('is NOT app-scoped and not parameterized — an app can only open its own', () => {
@@ -638,8 +638,8 @@ describe('link:open — the baseline outward-link action (R3-619)', () => {
     expect(tierOf('link:open')).toBe('baseline');
     expect(isBaseline('link:open')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('link:open');
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.17.0');
+    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0).
+    expect(REGISTRY_VERSION).toBe('1.18.0');
   });
 
   it('is baseline because linking outward is ordinary — the PER-CALL confirmation is the protection', () => {
@@ -670,5 +670,42 @@ describe('link:open — the baseline outward-link action (R3-619)', () => {
     // answering `forbidden` forever.
     expect(isSupportedCapability('link:open', '1.16.0')).toBe(false);
     expect(isSupportedCapability('link:open', '1.17.0')).toBe(true);
+  });
+});
+
+// R3-620 (LLM_AND_AGENTS_SPEC §0 correction): the editing-session model choice.
+describe('llm:chooseModel — the elevated, non-app-scoped read (R3-620)', () => {
+  it('is an ELEVATED read named by this registry version', () => {
+    expect(CAPABILITIES['llm:chooseModel']).toEqual({
+      kind: 'read',
+      tier: 'elevated',
+      since: '1.18.0',
+    });
+    expect(tierOf('llm:chooseModel')).toBe('elevated');
+    expect(isBaseline('llm:chooseModel')).toBe(false);
+    expect(BASELINE_CAPABILITIES).not.toContain('llm:chooseModel');
+    // The global pin lives with the NEWEST row (this one).
+    expect(REGISTRY_VERSION).toBe('1.18.0');
+  });
+
+  it('is NOT app-scoped — a stage app is refused with no prompt, not earnable by consent', () => {
+    // The whole point of the principal scope: `llm:chat` is app-scoped (a stage app
+    // earns it), but choosing WHICH model is editing-session authority. Non-app-scoped
+    // means region-binding-only — the workbench running under the editing-session
+    // principal can hold it, a stage app is refused above its ceiling with no prompt.
+    expect(isAppScoped('llm:chooseModel')).toBe(false);
+    expect(APP_SCOPED_CAPABILITIES).not.toContain('llm:chooseModel');
+    expect(CAPABILITIES['llm:chooseModel'].appScoped).toBeUndefined();
+    expect(CAPABILITIES['llm:chooseModel'].parameterized).toBeUndefined();
+  });
+
+  it('is distinct from llm:chat — calling is app-scoped, choosing is not', () => {
+    expect(CAPABILITIES['llm:chat']).toMatchObject({ kind: 'action', tier: 'elevated', appScoped: true });
+    expect(CAPABILITIES['llm:chooseModel']).toMatchObject({ kind: 'read', tier: 'elevated' });
+  });
+
+  it('a host on a PRE-llm:chooseModel vocabulary is refused, not silently drained', () => {
+    expect(isSupportedCapability('llm:chooseModel', '1.17.0')).toBe(false);
+    expect(isSupportedCapability('llm:chooseModel', '1.18.0')).toBe(true);
   });
 });
