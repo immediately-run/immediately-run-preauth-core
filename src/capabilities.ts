@@ -80,7 +80,11 @@ export type Capability =
   // is ordinary — but the destination is arbitrary, so the handler confirms every
   // call (the full URL in host chrome, opened only on the user's click) and the row
   // is marked `maximallyExplicit` even at baseline. See the table entry.
-  | 'link:open';
+  | 'link:open'
+  // R3-620 (LLM_AND_AGENTS_SPEC §0 correction): read the user's CONNECTED providers and
+  // their models, so an editing-session workbench can offer a per-conversation model
+  // choice. Elevated READ and deliberately NOT app-scoped — see the table entry.
+  | 'llm:chooseModel';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -557,6 +561,18 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // `maximallyExplicit: true` even at the baseline tier: the one consent moment this
   // capability ever produces must be the scariest styling, never a bundled prompt.
   'link:open': { kind: 'action', tier: 'baseline', since: '1.17.0', maximallyExplicit: true },
+  // R3-620 (LLM_AND_AGENTS_SPEC §0 correction): the editing-session model choice. A
+  // workbench app running under the EDITING-SESSION principal offers its user a
+  // per-conversation choice among the providers THEY connected; this capability is how
+  // it reads that list (provider id, display name, and the catalogue-recommended plus
+  // user-chosen models — names and ids only, never keys/usage/routing).
+  //
+  // ELEVATED, and deliberately NOT app-scoped: a stage app that requests it is refused
+  // with NO prompt, because a capability above the principal's ceiling is refused,
+  // full stop — exactly the distinction the §0 rule is now written around ("apps name
+  // no model" binds the STAGE; the editing session is the user's own choice). No new
+  // axis, no allowlist: the existing ceiling is the enforcement.
+  'llm:chooseModel': { kind: 'read', tier: 'elevated', since: '1.18.0' },
 };
 
 // `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
@@ -611,13 +627,19 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
  *
- *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
- *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
- *  It takes its own version for the settled reason: 1.16.0 is already published
- *  (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
- *  `protocol-openlink` gate row, so a binding that requests the capability would
- *  mount with the action refusing to `forbidden` rather than opening a confirmed
- *  tab — the T26 refusal is the right outcome.
+  * Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
+  * (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
+  * It takes its own version for the settled reason: 1.16.0 is already published
+  * (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
+  * `protocol-openlink` gate row, so a binding that requests the capability would
+  * mount with the action refusing to `forbidden` rather than opening a confirmed
+  * tab — the T26 refusal is the right outcome.
+ *
+ *  Prior notes — bumped to 1.18.0 with the ELEVATED, non-app-scoped `llm:chooseModel`
+ *  (LLM_AND_AGENTS_SPEC §0 correction — R3-620): the editing-session model choice.
+ *  A host older than 1.18.0 has no `llm:chooseModel` row, so a binding that requests
+ *  it cannot mount a surface that reads the connected-provider list — the T26 refusal
+ *  is the right outcome there too.
  *
  *  Prior notes — bumped to 1.11.0 with the elevated,
  *  app-scoped `device:camera` and `device:microphone` — the two CAPTURE devices
@@ -678,7 +700,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.17.0';
+export const REGISTRY_VERSION = '1.18.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
