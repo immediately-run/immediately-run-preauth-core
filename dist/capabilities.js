@@ -510,13 +510,13 @@ exports.CAPABILITIES = {
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
  *
-  * Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
-  * (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
-  * It takes its own version for the settled reason: 1.16.0 is already published
-  * (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
-  * `protocol-openlink` gate row, so a binding that requests the capability would
-  * mount with the action refusing to `forbidden` rather than opening a confirmed
-  * tab — the T26 refusal is the right outcome.
+ *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
+ *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
+ *  It takes its own version for the settled reason: 1.16.0 is already published
+ *  (**0.1.22**, with `storage:local`). A host older than 1.17.0 has no
+ *  `protocol-openlink` gate row, so a binding that requests the capability would
+ *  mount with the action refusing to `forbidden` rather than opening a confirmed
+ *  tab — the T26 refusal is the right outcome.
  *
  *  Prior notes — bumped to 1.18.0 with the ELEVATED, non-app-scoped `llm:chooseModel`
  *  (LLM_AND_AGENTS_SPEC §0 correction — R3-620): the editing-session model choice.
