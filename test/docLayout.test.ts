@@ -73,7 +73,7 @@ describe('docLayout — paths', () => {
   });
 
   // R3-633a — the space keyring (REALTIME_MESSAGING §4/§6.1). The §4 table's
-  // `spaces/{spaceId}/memberKeys/{userId}/{kid}` is 5-segment SHORTHAND (a
+  // `spaces/{spaceId}/memberKeys/{userId}/{kid}` is 5-segment shorthand (a
   // collection under Firestore's alternation); the builders resolve it to the
   // 6-segment document path with `published` as the disambiguating segment.
   it('memberKeys builders resolve the §4 shorthand to the document path', () => {

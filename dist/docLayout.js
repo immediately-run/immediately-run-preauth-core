@@ -215,7 +215,7 @@ exports.appCountPath = appCountPath;
 //
 // The per-space registry of member ECDH **public** keys: the §4 table prints the
 // path as `spaces/{spaceId}/memberKeys/{userId}/{kid}`, five segments — which in
-// Firestore's collection/document alternation names a COLLECTION, not the document
+// Firestore's collection/document alternation names a collection, not the document
 // the row describes. The keying it states — `(user, kid)` — is right; the string
 // is shorthand. The builders below resolve it to the 6-segment document path the
 // alternation requires, with `published` as the disambiguating collection segment
@@ -223,12 +223,12 @@ exports.appCountPath = appCountPath;
 // `rooms/{roomId}/keys/{userId}`, where the two mean opposite things — a public
 // half here vs. a wrapped DEK there).
 //
-// The parent `memberKeys/{userId}` document is a PHANTOM — never written, which
+// The parent `memberKeys/{userId}` document is a phantom — never written, which
 // Firestore permits; nothing creates a placeholder doc to "make the path real".
-// `(uid, kid)` is deliberately NOT encoded into one composite doc id (the
+// `(uid, kid)` is deliberately not encoded into one composite doc id (the
 // `grantDocId` precedent does not transfer): the rules predicate over this
-// subtree is `request.auth.uid == userId`, which needs `userId` as a PATH
-// VARIABLE, and a rule that parses a doc id to recover the writer is a rule
+// subtree is `request.auth.uid == userId`, which needs `userId` as a path
+// variable, and a rule that parses a doc id to recover the writer is a rule
 // someone can get wrong.
 /** `spaces/{spaceId}/memberKeys/{uid}/published` — the collection holding one
  *  member's published public-key entries (odd segment count ⇒ collection). */
