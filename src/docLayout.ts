@@ -256,6 +256,43 @@ export const appCountPath = (uid: string, appKey: string): DocPath => [
   assertAppKeySegment(appKey),
 ];
 
+// --- the space member-keys registry (REALTIME_MESSAGING §4/§6.1, R3-633a) ------
+//
+// The per-space registry of member ECDH **public** keys: the §4 table prints the
+// path as `spaces/{spaceId}/memberKeys/{userId}/{kid}`, five segments — which in
+// Firestore's collection/document alternation names a COLLECTION, not the document
+// the row describes. The keying it states — `(user, kid)` — is right; the string
+// is shorthand. The builders below resolve it to the 6-segment document path the
+// alternation requires, with `published` as the disambiguating collection segment
+// (`published` greps uniquely: `keys` would collide with
+// `rooms/{roomId}/keys/{userId}`, where the two mean opposite things — a public
+// half here vs. a wrapped DEK there).
+//
+// The parent `memberKeys/{userId}` document is a PHANTOM — never written, which
+// Firestore permits; nothing creates a placeholder doc to "make the path real".
+// `(uid, kid)` is deliberately NOT encoded into one composite doc id (the
+// `grantDocId` precedent does not transfer): the rules predicate over this
+// subtree is `request.auth.uid == userId`, which needs `userId` as a PATH
+// VARIABLE, and a rule that parses a doc id to recover the writer is a rule
+// someone can get wrong.
+
+/** `spaces/{spaceId}/memberKeys/{uid}/published` — the collection holding one
+ *  member's published public-key entries (odd segment count ⇒ collection). */
+export const memberKeysCollection = (spaceId: string, uid: string): DocPath => [
+  ...spacePath(spaceId),
+  'memberKeys',
+  uid,
+  'published',
+];
+
+/** `spaces/{spaceId}/memberKeys/{uid}/published/{kid}` — one member's one
+ *  published public key (even segment count ⇒ document). Write-once per `kid`
+ *  (append-only, §6.1); readable by every space member. */
+export const memberKeysDoc = (spaceId: string, uid: string, kid: string): DocPath => [
+  ...memberKeysCollection(spaceId, uid),
+  kid,
+];
+
 // --- field objects (inject the timestamp/increment sentinels) ---------------
 
 /** `spaces/{spaceId}` — the root doc (written WITHOUT merge). */

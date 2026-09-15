@@ -102,6 +102,13 @@ export declare const appKeyPath: (uid: string, appKey: string) => DocPath;
 export declare const appSpacePath: (uid: string, appKey: string, spaceId: string, qualifyingPrincipal?: string) => DocPath;
 export declare const userCountPath: (uid: string) => DocPath;
 export declare const appCountPath: (uid: string, appKey: string) => DocPath;
+/** `spaces/{spaceId}/memberKeys/{uid}/published` — the collection holding one
+ *  member's published public-key entries (odd segment count ⇒ collection). */
+export declare const memberKeysCollection: (spaceId: string, uid: string) => DocPath;
+/** `spaces/{spaceId}/memberKeys/{uid}/published/{kid}` — one member's one
+ *  published public key (even segment count ⇒ document). Write-once per `kid`
+ *  (append-only, §6.1); readable by every space member. */
+export declare const memberKeysDoc: (spaceId: string, uid: string, kid: string) => DocPath;
 /** `spaces/{spaceId}` — the root doc (written WITHOUT merge). */
 export declare const spaceDocFields: (params: Pick<CreateSpaceParams, "owner" | "name" | "createdInNamespace" | "createdInRepository">, s: MintSentinels) => Record<string, unknown>;
 /** `spaces/{spaceId}/members/{user:owner}` — the owner membership (no merge). */

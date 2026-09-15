@@ -26,7 +26,7 @@
 // browser. What both sides DO share is `assertAppKeySegment` — the one property
 // a wrong path would violate. Unifying the ref construction is tracked debt.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.memberKeysDoc = exports.memberKeysCollection = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -211,6 +211,42 @@ const appCountPath = (uid, appKey) => [
     (0, exports.assertAppKeySegment)(appKey),
 ];
 exports.appCountPath = appCountPath;
+// --- the space member-keys registry (REALTIME_MESSAGING §4/§6.1, R3-633a) ------
+//
+// The per-space registry of member ECDH **public** keys: the §4 table prints the
+// path as `spaces/{spaceId}/memberKeys/{userId}/{kid}`, five segments — which in
+// Firestore's collection/document alternation names a COLLECTION, not the document
+// the row describes. The keying it states — `(user, kid)` — is right; the string
+// is shorthand. The builders below resolve it to the 6-segment document path the
+// alternation requires, with `published` as the disambiguating collection segment
+// (`published` greps uniquely: `keys` would collide with
+// `rooms/{roomId}/keys/{userId}`, where the two mean opposite things — a public
+// half here vs. a wrapped DEK there).
+//
+// The parent `memberKeys/{userId}` document is a PHANTOM — never written, which
+// Firestore permits; nothing creates a placeholder doc to "make the path real".
+// `(uid, kid)` is deliberately NOT encoded into one composite doc id (the
+// `grantDocId` precedent does not transfer): the rules predicate over this
+// subtree is `request.auth.uid == userId`, which needs `userId` as a PATH
+// VARIABLE, and a rule that parses a doc id to recover the writer is a rule
+// someone can get wrong.
+/** `spaces/{spaceId}/memberKeys/{uid}/published` — the collection holding one
+ *  member's published public-key entries (odd segment count ⇒ collection). */
+const memberKeysCollection = (spaceId, uid) => [
+    ...(0, exports.spacePath)(spaceId),
+    'memberKeys',
+    uid,
+    'published',
+];
+exports.memberKeysCollection = memberKeysCollection;
+/** `spaces/{spaceId}/memberKeys/{uid}/published/{kid}` — one member's one
+ *  published public key (even segment count ⇒ document). Write-once per `kid`
+ *  (append-only, §6.1); readable by every space member. */
+const memberKeysDoc = (spaceId, uid, kid) => [
+    ...(0, exports.memberKeysCollection)(spaceId, uid),
+    kid,
+];
+exports.memberKeysDoc = memberKeysDoc;
 // --- field objects (inject the timestamp/increment sentinels) ---------------
 /** `spaces/{spaceId}` — the root doc (written WITHOUT merge). */
 const spaceDocFields = (params, s) => (0, exports.defined)({

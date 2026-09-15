@@ -25,6 +25,8 @@ import {
   grantKeyWithPrincipal,
   parseGrantDocId,
   parseGrantKey,
+  memberKeysCollection,
+  memberKeysDoc,
   memberPath,
   mergeCapabilities,
   mergeNetFetchHosts,
@@ -68,6 +70,32 @@ describe('docLayout — paths', () => {
     expect(appSpacePath('u1', 'app', 's1', 'editor.file-explorer')).toEqual([
       'user-app-spaces', 'u1', 'apps', 'app', 'spaces', 'editor.file-explorer~s1',
     ]);
+  });
+
+  // R3-633a — the space keyring (REALTIME_MESSAGING §4/§6.1). The §4 table's
+  // `spaces/{spaceId}/memberKeys/{userId}/{kid}` is 5-segment SHORTHAND (a
+  // collection under Firestore's alternation); the builders resolve it to the
+  // 6-segment document path with `published` as the disambiguating segment.
+  it('memberKeys builders resolve the §4 shorthand to the document path', () => {
+    const expected = ['spaces', 's', 'memberKeys', 'u', 'published', 'k'];
+    expect(memberKeysDoc('s', 'u', 'k')).toEqual(expected);
+    // The collection is the document path minus its last segment.
+    expect(memberKeysCollection('s', 'u')).toEqual(expected.slice(0, -1));
+  });
+
+  it('memberKeys paths honour the collection/document alternation', () => {
+    // The invariant asserted as a property: a document path is even, a
+    // collection path odd — not a second copy of the literal.
+    expect(memberKeysDoc('s', 'u', 'k').length % 2).toBe(0);
+    expect(memberKeysCollection('s', 'u').length % 2).toBe(1);
+  });
+
+  it('memberKeysDoc stays rooted at spacePath', () => {
+    // The prefix is derived from the neighbouring real builder, so a change to
+    // the `spaces` root cannot silently fork the keyring off it.
+    const root = spacePath('s');
+    expect(memberKeysDoc('s', 'u', 'k').slice(0, root.length)).toEqual(root);
+    expect(memberKeysCollection('s', 'u').slice(0, root.length)).toEqual(root);
   });
 });
 
