@@ -1,7 +1,7 @@
 {
   "name": "@immediately-run/preauth-core",
   "version": "0.1.25",
-  "description": "The shared §8.9 pre-auth target check + the single grant-mint path (mintConsentedGrants) + the capability vocabulary + the byte-faithful grant/space/net-fetch document layout. Consumed by site-main (browser Firestore) and the backend (admin Firestore) so there is ONE gate, ONE mint path, ONE wire layout.",
+  "description": "The shared \u00a78.9 pre-auth target check + the single grant-mint path (mintConsentedGrants) + the capability vocabulary + the byte-faithful grant/space/net-fetch document layout. Consumed by site-main (browser Firestore) and the backend (admin Firestore) so there is ONE gate, ONE mint path, ONE wire layout.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -26,7 +26,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "jest",
-    "lint": "eslint src test",
+    "lint": "eslint src test --max-warnings 0",
     "prepare": "npm run build"
   },
   "devDependencies": {
