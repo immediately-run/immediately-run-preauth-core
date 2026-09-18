@@ -20,9 +20,10 @@ R3-124). **Nothing here is removed** — dim-4 is *flag only*.
   those paths. No exported symbol is orphaned.
 - **Every capability maps to a spec.** Each entry in `CAPABILITIES` traces to a
   CAPABILITY_REFERENCE row or a sibling spec (UI_AS_APPS, EDITOR_AS_APP, EDITOR_FIRST,
-  FILE_EXPLORER, LLM_AND_AGENTS, SERVICE_PROVIDERS, SECRETS, LOCAL_DEV_AUTHED_SERVER). No
-  capability is defined here but referenced by no live spec. `llm:chat` (`since: 1.3.0`)
-  maps to SERVICE_PROVIDERS `llm.chat@1` / LLM_AND_AGENTS D5; `llm:chooseModel`
+  FILE_EXPLORER, LLM_AND_AGENTS, REALTIME_MESSAGING, SERVICE_PROVIDERS, SECRETS,
+  LOCAL_DEV_AUTHED_SERVER). No capability is defined here but referenced by no live spec.
+  `llm:chat` (`since: 1.3.0`) maps to SERVICE_PROVIDERS `llm.chat@1` / LLM_AND_AGENTS D5;
+  `llm:chooseModel`
   (`since: 1.18.0`, R3-620) maps to LLM_AND_AGENTS §0's editing-session correction.
 
 **No `// DEAD-CANDIDATE` markers were added** — nothing is genuinely dead. Recorded
