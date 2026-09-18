@@ -215,7 +215,12 @@ export async function applyPreAuth(
     return { ok: false, refused: plan.refused };
   }
   // The plain on/off caps to mint: every grantable cap EXCEPT the host-parameterized
-  // ones (net:fetch), which are minted as their host set via `netFetchHosts`.
+  // ones — `net:fetch` and `feed:fetch` (minted as their host set / compiled templates
+  // via their own paths) and, from registry 1.19.0, the five REALTIME_MESSAGING room
+  // rows (`room:read`/`room:write`/`presence:read`/`presence:set`/`notify:member`),
+  // whose room-set parameter mint path arrives with the R-2 host verbs — so at this
+  // rung they are excluded from the plain mint and minted nowhere. `netFetchHosts`
+  // is the only parameter mint input this flow carries today.
   const plainCaps = plan.grantable.filter((c) => !isHostParameterized(c));
   const mint = await mintConsentedGrants(
     store,

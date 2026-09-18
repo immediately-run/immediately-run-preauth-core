@@ -135,10 +135,12 @@ export interface CapabilityDef {
    *  Seven of those — `net:fetch` and `feed:fetch`, plus the five R3-634 room rows
    *  other than `room:create` — are additionally HOST-PARAMETERIZED (see
    *  `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
-   *  capability: the durable authority IS their parameter set. `task:invoke` is
-   *  `parameterized` but bounded by the manifest, not a durable grant param. The
-   *  remaining ten are plain on/off grants. That distinction bounds what a grant
-   *  CONVEYS; it does not narrow who may earn one, which is what `appScoped` decides. */
+   *  capability: the durable authority IS their parameter set. `task:invoke` and
+   *  `analytics:emit` are `parameterized` but bounded by the manifest (`invokes`,
+   *  §5.8) and the baked-in vocabulary hash respectively — not durable grant params —
+   *  so both ARE plain on/off grants. The remaining nine are plain on/off grants as
+   *  well. That distinction bounds what a grant CONVEYS; it does not narrow who may
+   *  earn one, which is what `appScoped` decides. */
   appScoped?: boolean;
   /** Render this capability's consent line with the platform's **maximally-
    *  explicit** (scariest) styling, never bundled into a combined prompt
@@ -818,13 +820,20 @@ export function isAppScoped(cap: Capability): boolean {
 
 /** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
  *  path: `net:fetch` (its granted host set, §5.11) and `feed:fetch` (its compiled
- *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2). These are granted by that
- *  path, never as a bare on/off capability: a bare `net:fetch` grant would be
- *  UNBOUNDED (every origin), and a bare `feed:fetch` grant would be unbounded the
- *  same way (no template, hence no fixed target), so the plain-capability mint
- *  (R3-233) MUST exclude them. `task:invoke` is `parameterized` too but its bound is
- *  the app's manifest `invokes` (§5.8), not a durable grant param, so it IS a plain
- *  on/off grant. */
+ *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2), plus — as of 1.19.0 — the
+ *  five REALTIME_MESSAGING §7 room rows `room:read`, `room:write`, `presence:read`,
+ *  `presence:set` and `notify:member`, whose parameter set is the granted room (and,
+ *  for notify, member) set (R3-634, R-0). All seven are granted by that path, never
+ *  as a bare on/off capability: a bare `net:fetch` grant would be UNBOUNDED (every
+ *  origin), a bare `feed:fetch` grant unbounded the same way (no template, hence no
+ *  fixed target), and a bare `room:read`/`room:write`/`presence:*`/`notify:member`
+ *  grant would be "one grant = every room" — exactly what §7's two-layered authority
+ *  exists to make impossible — so the plain-capability mint (R3-233) MUST exclude
+ *  them. At the R-0 rung the room rows are excluded and minted NOWHERE: their
+ *  parameter mint path arrives with the R-2 host verbs, so until then a binding that
+ *  requests one is refused by the version gate (T26) or drops it from the plain mint.
+ *  `task:invoke` is `parameterized` too but its bound is the app's manifest
+ *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
 export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = [
   'net:fetch',
   'feed:fetch',
