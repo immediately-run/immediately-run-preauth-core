@@ -84,7 +84,21 @@ export type Capability =
   // R3-620 (LLM_AND_AGENTS_SPEC §0 correction): read the user's CONNECTED providers and
   // their models, so an editing-session workbench can offer a per-conversation model
   // choice. Elevated READ and deliberately NOT app-scoped — see the table entry.
-  | 'llm:chooseModel';
+  | 'llm:chooseModel'
+  // R3-634 (REALTIME_MESSAGING_SPEC §7, ladder rung R-0): the six room capabilities —
+  // the closed kernel set for realtime rooms. All ELEVATED + app-scoped per the §7
+  // table; the five marked host-parameterized carry a durable (room, …) parameter set
+  // minted on their own path (never a bare on/off grant), while `room:create` is a
+  // plain on/off action. `notify:member` is additionally `maximallyExplicit` (it
+  // reaches another user's attention, §12). INERT at this rung: nothing mints or
+  // gates on them yet — enforcement (the vocabulary) ships before the authority
+  // (verbs, gates, SDK) that R-1..R-3 add, per P9. See the table entries.
+  | 'room:create'
+  | 'room:read'
+  | 'room:write'
+  | 'presence:read'
+  | 'presence:set'
+  | 'notify:member';
 
 export interface CapabilityDef {
   kind: CapabilityKind;
@@ -107,20 +121,24 @@ export interface CapabilityDef {
    *  **The app-scoped set, in full** — this is a security boundary, so it is stated
    *  completely rather than by example. The authoritative form is DERIVED, never
    *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-   *  and `isAppScoped` is what every consumer branches on. As of registry 1.13.0 the
-   *  twelve rows carrying it are:
+   *  and `isAppScoped` is what every consumer branches on. As of registry 1.19.0 the
+   *  eighteen rows carrying it are:
    *
    *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
    *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
    *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
    *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
-   *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485).
+   *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485) ·
+   *    `room:create`, `room:read`, `room:write`, `presence:read`, `presence:set` and
+   *    `notify:member` (R3-634, the REALTIME_MESSAGING §7 room set).
    *
-   *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
-   *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
-   *  capability: the durable authority IS their parameter set. The remaining nine are
-   *  plain on/off grants. That distinction bounds what a grant CONVEYS; it does not
-   *  narrow who may earn one, which is what `appScoped` decides. */
+   *  Seven of those — `net:fetch` and `feed:fetch`, plus the five R3-634 room rows
+   *  other than `room:create` — are additionally HOST-PARAMETERIZED (see
+   *  `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
+   *  capability: the durable authority IS their parameter set. `task:invoke` is
+   *  `parameterized` but bounded by the manifest, not a durable grant param. The
+   *  remaining ten are plain on/off grants. That distinction bounds what a grant
+   *  CONVEYS; it does not narrow who may earn one, which is what `appScoped` decides. */
   appScoped?: boolean;
   /** Render this capability's consent line with the platform's **maximally-
    *  explicit** (scariest) styling, never bundled into a combined prompt
@@ -573,6 +591,58 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // no model" binds the STAGE; the editing session is the user's own choice). No new
   // axis, no allowlist: the existing ceiling is the enforcement.
   'llm:chooseModel': { kind: 'read', tier: 'elevated', since: '1.18.0' },
+  // R3-634 (REALTIME_MESSAGING_SPEC §7 — ladder rung R-0): the six room capabilities,
+  // flags verbatim from the §7 table. All are ELEVATED + app-scoped (earnable by an
+  // app via the consent band, recorded per (user, appKey)); `room:read`/`presence:read`
+  // are reads, the rest actions. The five host-parameterized rows mirror
+  // `net:fetch`/`feed:fetch`: their durable authority is a parameter set minted on its
+  // own path and excluded from the plain on/off mint, so "one grant = every room" is
+  // impossible by construction (G6). `room:create` is the one plain on/off action.
+  // `notify:member` is `maximallyExplicit` — it reaches another user's attention, the
+  // scariest consent styling, never bundled (§7/§12). INERT at this rung: no verb
+  // gates on them yet (R-2), no SDK export (R-3), no store writes (R-1).
+  'room:create': {
+    kind: 'action',
+    tier: 'elevated',
+    since: '1.19.0',
+    appScoped: true,
+  },
+  'room:read': {
+    kind: 'read',
+    tier: 'elevated',
+    since: '1.19.0',
+    parameterized: true,
+    appScoped: true,
+  },
+  'room:write': {
+    kind: 'action',
+    tier: 'elevated',
+    since: '1.19.0',
+    parameterized: true,
+    appScoped: true,
+  },
+  'presence:read': {
+    kind: 'read',
+    tier: 'elevated',
+    since: '1.19.0',
+    parameterized: true,
+    appScoped: true,
+  },
+  'presence:set': {
+    kind: 'action',
+    tier: 'elevated',
+    since: '1.19.0',
+    parameterized: true,
+    appScoped: true,
+  },
+  'notify:member': {
+    kind: 'action',
+    tier: 'elevated',
+    since: '1.19.0',
+    parameterized: true,
+    appScoped: true,
+    maximallyExplicit: true,
+  },
 };
 
 // `device:clipboard` — proposed in BROWSER_CAPABILITIES_SPEC §2, DELIBERATELY LEFT
@@ -626,6 +696,20 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
+ *
+ *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
+ *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,
+ *  `room:write`, `presence:read`, `presence:set`, `notify:member` (R3-634, ladder
+ *  rung R-0). All six ship together in one version because they are one kernel set:
+ *  a host either has the room vocabulary or it has none of it, and a binding that
+ *  requests any of them on an older host must be refused whole (T26) rather than
+ *  mounting with the requested room feature silently inert — the same
+ *  ship-together reasoning as the `device:camera`/`device:microphone` pair at
+ *  1.11.0. Five of the six are host-parameterized (the `net:fetch`/`feed:fetch`
+ *  mechanism), so they can never be minted as a bare on/off grant; `notify:member`
+ *  is additionally `maximallyExplicit`. INERT at this rung by design (P9): no verb,
+ *  gate or SDK surface consumes them yet — the vocabulary lands first so every later
+ *  rung (R-1 store, R-2 verbs/gates, R-3 SDK) gates behind existing enforcement.
  *
  *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
  *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
@@ -700,7 +784,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.18.0';
+export const REGISTRY_VERSION = '1.19.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
@@ -741,7 +825,15 @@ export function isAppScoped(cap: Capability): boolean {
  *  (R3-233) MUST exclude them. `task:invoke` is `parameterized` too but its bound is
  *  the app's manifest `invokes` (§5.8), not a durable grant param, so it IS a plain
  *  on/off grant. */
-export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = ['net:fetch', 'feed:fetch'];
+export const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[] = [
+  'net:fetch',
+  'feed:fetch',
+  'room:read',
+  'room:write',
+  'presence:read',
+  'presence:set',
+  'notify:member',
+];
 
 export function isHostParameterized(cap: Capability): boolean {
   return HOST_PARAMETERIZED_CAPABILITIES.includes(cap);
