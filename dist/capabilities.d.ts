@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone' | 'recents:read' | 'workspace:read' | 'theme:sources' | 'storage:local' | 'link:open' | 'llm:chooseModel';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone' | 'recents:read' | 'workspace:read' | 'theme:sources' | 'storage:local' | 'link:open' | 'llm:chooseModel' | 'room:create' | 'room:read' | 'room:write' | 'presence:read' | 'presence:set' | 'notify:member';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -22,20 +22,26 @@ export interface CapabilityDef {
      *  **The app-scoped set, in full** — this is a security boundary, so it is stated
      *  completely rather than by example. The authoritative form is DERIVED, never
      *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-     *  and `isAppScoped` is what every consumer branches on. As of registry 1.13.0 the
-     *  twelve rows carrying it are:
+     *  and `isAppScoped` is what every consumer branches on. As of registry 1.19.0 the
+     *  eighteen rows carrying it are:
      *
      *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
      *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
      *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
      *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
-     *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485).
+     *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485) ·
+     *    `room:create`, `room:read`, `room:write`, `presence:read`, `presence:set` and
+     *    `notify:member` (R3-634, the REALTIME_MESSAGING §7 room set).
      *
-     *  Two of those — `net:fetch` and `feed:fetch` — are additionally HOST-PARAMETERIZED
-     *  (see `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
-     *  capability: the durable authority IS their parameter set. The remaining nine are
-     *  plain on/off grants. That distinction bounds what a grant CONVEYS; it does not
-     *  narrow who may earn one, which is what `appScoped` decides. */
+     *  Seven of those — `net:fetch` and `feed:fetch`, plus the five R3-634 room rows
+     *  other than `room:create` — are additionally HOST-PARAMETERIZED (see
+     *  `HOST_PARAMETERIZED_CAPABILITIES`), so they are never earned as a bare on/off
+     *  capability: the durable authority IS their parameter set. `task:invoke` and
+     *  `analytics:emit` are `parameterized` but bounded by the manifest (`invokes`,
+     *  §5.8) and the baked-in vocabulary hash respectively — not durable grant params —
+     *  so both ARE plain on/off grants. The remaining nine are plain on/off grants as
+     *  well. That distinction bounds what a grant CONVEYS; it does not narrow who may
+     *  earn one, which is what `appScoped` decides. */
     appScoped?: boolean;
     /** Render this capability's consent line with the platform's **maximally-
      *  explicit** (scariest) styling, never bundled into a combined prompt
@@ -60,6 +66,20 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
+ *
+ *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
+ *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,
+ *  `room:write`, `presence:read`, `presence:set`, `notify:member` (R3-634, ladder
+ *  rung R-0). All six ship together in one version because they are one kernel set:
+ *  a host either has the room vocabulary or it has none of it, and a binding that
+ *  requests any of them on an older host must be refused whole (T26) rather than
+ *  mounting with the requested room feature silently inert — the same
+ *  ship-together reasoning as the `device:camera`/`device:microphone` pair at
+ *  1.11.0. Five of the six are host-parameterized (the `net:fetch`/`feed:fetch`
+ *  mechanism), so they can never be minted as a bare on/off grant; `notify:member`
+ *  is additionally `maximallyExplicit`. INERT at this rung by design (P9): no verb,
+ *  gate or SDK surface consumes them yet — the vocabulary lands first so every later
+ *  rung (R-1 store, R-2 verbs/gates, R-3 SDK) gates behind existing enforcement.
  *
  *  Prior notes — bumped to 1.17.0 with the BASELINE `link:open`
  *  (`UI_AS_APPS_SPEC` D-UAA-13 — R3-619): the host-brokered outward-link affordance.
@@ -134,7 +154,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export declare const REGISTRY_VERSION = "1.18.0";
+export declare const REGISTRY_VERSION = "1.19.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;
@@ -149,13 +169,20 @@ export declare const APP_SCOPED_CAPABILITIES: readonly Capability[];
 export declare function isAppScoped(cap: Capability): boolean;
 /** App-scoped caps whose durable authority is a PARAMETER SET minted on its own
  *  path: `net:fetch` (its granted host set, §5.11) and `feed:fetch` (its compiled
- *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2). These are granted by that
- *  path, never as a bare on/off capability: a bare `net:fetch` grant would be
- *  UNBOUNDED (every origin), and a bare `feed:fetch` grant would be unbounded the
- *  same way (no template, hence no fixed target), so the plain-capability mint
- *  (R3-233) MUST exclude them. `task:invoke` is `parameterized` too but its bound is
- *  the app's manifest `invokes` (§5.8), not a durable grant param, so it IS a plain
- *  on/off grant. */
+ *  request templates, `CONNECTOR_EGRESS_FIXING_SPEC` §2), plus — as of 1.19.0 — the
+ *  five REALTIME_MESSAGING §7 room rows `room:read`, `room:write`, `presence:read`,
+ *  `presence:set` and `notify:member`, whose parameter set is the granted room (and,
+ *  for notify, member) set (R3-634, R-0). All seven are granted by that path, never
+ *  as a bare on/off capability: a bare `net:fetch` grant would be UNBOUNDED (every
+ *  origin), a bare `feed:fetch` grant unbounded the same way (no template, hence no
+ *  fixed target), and a bare `room:read`/`room:write`/`presence:*`/`notify:member`
+ *  grant would be "one grant = every room" — exactly what §7's two-layered authority
+ *  exists to make impossible — so the plain-capability mint (R3-233) MUST exclude
+ *  them. At the R-0 rung the room rows are excluded and minted NOWHERE: their
+ *  parameter mint path arrives with the R-2 host verbs, so until then a binding that
+ *  requests one is refused by the version gate (T26) or drops it from the plain mint.
+ *  `task:invoke` is `parameterized` too but its bound is the app's manifest
+ *  `invokes` (§5.8), not a durable grant param, so it IS a plain on/off grant. */
 export declare const HOST_PARAMETERIZED_CAPABILITIES: readonly Capability[];
 export declare function isHostParameterized(cap: Capability): boolean;
 /** Compare dotted numeric versions: <0 if a<b, 0 if equal, >0 if a>b. Missing

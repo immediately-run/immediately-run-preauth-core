@@ -497,9 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0) — the
+    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634) — the
     // workspace row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.18.0');
+    expect(REGISTRY_VERSION).toBe('1.19.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -550,9 +550,9 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     expect(tierOf('theme:sources')).toBe('elevated');
     expect(isBaseline('theme:sources')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
-    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0) — the
+    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634) — the
     // theme:sources row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.18.0');
+    expect(REGISTRY_VERSION).toBe('1.19.0');
   });
 
   it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
@@ -595,8 +595,8 @@ describe('storage:local — the baseline device-local store open verb (R3-558)',
     expect(tierOf('storage:local')).toBe('baseline');
     expect(isBaseline('storage:local')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('storage:local');
-    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0).
-    expect(REGISTRY_VERSION).toBe('1.18.0');
+    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634).
+    expect(REGISTRY_VERSION).toBe('1.19.0');
   });
 
   it('is NOT app-scoped and not parameterized — an app can only open its own', () => {
@@ -638,8 +638,8 @@ describe('link:open — the baseline outward-link action (R3-619)', () => {
     expect(tierOf('link:open')).toBe('baseline');
     expect(isBaseline('link:open')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('link:open');
-    // The global pin moved on to the NEWEST row (llm:chooseModel, 1.18.0).
-    expect(REGISTRY_VERSION).toBe('1.18.0');
+    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634).
+    expect(REGISTRY_VERSION).toBe('1.19.0');
   });
 
   it('is baseline because linking outward is ordinary — the PER-CALL confirmation is the protection', () => {
@@ -684,8 +684,7 @@ describe('llm:chooseModel — the elevated, non-app-scoped read (R3-620)', () =>
     expect(tierOf('llm:chooseModel')).toBe('elevated');
     expect(isBaseline('llm:chooseModel')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('llm:chooseModel');
-    // The global pin lives with the NEWEST row (this one).
-    expect(REGISTRY_VERSION).toBe('1.18.0');
+    // The global pin lives with the NEWEST row — the room set at 1.19.0 (R3-634).
   });
 
   it('is NOT app-scoped — a stage app is refused with no prompt, not earnable by consent', () => {
@@ -707,5 +706,67 @@ describe('llm:chooseModel — the elevated, non-app-scoped read (R3-620)', () =>
   it('a host on a PRE-llm:chooseModel vocabulary is refused, not silently drained', () => {
     expect(isSupportedCapability('llm:chooseModel', '1.17.0')).toBe(false);
     expect(isSupportedCapability('llm:chooseModel', '1.18.0')).toBe(true);
+  });
+});
+
+// R3-634 (REALTIME_MESSAGING_SPEC §7 — ladder rung R-0): the six room capabilities,
+// flags verbatim from the §7 table, inert at this rung (no verb/gate/SDK consumer —
+// P9: the vocabulary ships before the authority that R-1..R-3 add).
+describe('the REALTIME_MESSAGING §7 room capabilities (R3-634, R-0)', () => {
+  const ROOM_CAPS = ['room:create', 'room:read', 'room:write', 'presence:read', 'presence:set', 'notify:member'] as const;
+
+  it('each of the six is known, elevated and app-scoped, landing at this registry version', () => {
+    for (const cap of ROOM_CAPS) {
+      expect(isKnownCapability(cap)).toBe(true);
+      expect(tierOf(cap)).toBe('elevated');
+      expect(isBaseline(cap)).toBe(false);
+      expect(BASELINE_CAPABILITIES).not.toContain(cap);
+      expect(isAppScoped(cap)).toBe(true);
+      // APP_SCOPED_CAPABILITIES is DERIVED from the table — the six join it, proving
+      // the flag and the derived set agree (never retype the table).
+      expect(APP_SCOPED_CAPABILITIES).toContain(cap);
+      expect(CAPABILITIES[cap].since).toBe('1.19.0');
+    }
+    // The global pin lives with the NEWEST row (the room set).
+    expect(REGISTRY_VERSION).toBe('1.19.0');
+  });
+
+  it('kinds follow the §7 table: room:read and presence:read are reads, the rest actions', () => {
+    expect(CAPABILITIES['room:read'].kind).toBe('read');
+    expect(CAPABILITIES['presence:read'].kind).toBe('read');
+    expect(CAPABILITIES['room:create'].kind).toBe('action');
+    expect(CAPABILITIES['room:write'].kind).toBe('action');
+    expect(CAPABILITIES['presence:set'].kind).toBe('action');
+    expect(CAPABILITIES['notify:member'].kind).toBe('action');
+  });
+
+  it('the five are HOST-PARAMETERIZED (durable room-set authority, never a bare on/off grant); room:create is not', () => {
+    for (const cap of ['room:read', 'room:write', 'presence:read', 'presence:set', 'notify:member'] as const) {
+      expect(isHostParameterized(cap)).toBe(true);
+      expect(HOST_PARAMETERIZED_CAPABILITIES).toContain(cap);
+      expect(CAPABILITIES[cap].parameterized).toBe(true);
+    }
+    expect(isHostParameterized('room:create')).toBe(false);
+    expect(HOST_PARAMETERIZED_CAPABILITIES).not.toContain('room:create');
+    expect(CAPABILITIES['room:create'].parameterized).toBeUndefined();
+  });
+
+  it('notify:member is maximallyExplicit — it reaches another user\'s attention (§12)', () => {
+    expect(CAPABILITIES['notify:member'].maximallyExplicit).toBe(true);
+    for (const cap of ROOM_CAPS) {
+      if (cap !== 'notify:member') expect(CAPABILITIES[cap].maximallyExplicit).toBeUndefined();
+    }
+  });
+
+  it('a host on a PRE-room vocabulary is refused whole, not silently drained (T26)', () => {
+    // A binding that requests any of the six on an older host must be refused rather
+    // than mounting with the room feature inert — the ship-together rule the 1.19.0
+    // note states.
+    for (const cap of ROOM_CAPS) {
+      expect(isSupportedCapability(cap, '1.18.0')).toBe(false);
+      expect(isSupportedCapability(cap, '1.19.0')).toBe(true);
+    }
+    expect(unsupportedCapabilities([...ROOM_CAPS], '1.18.0')).toEqual([...ROOM_CAPS]);
+    expect(unsupportedCapabilities([...ROOM_CAPS], REGISTRY_VERSION)).toEqual([]);
   });
 });
