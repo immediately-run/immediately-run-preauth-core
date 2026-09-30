@@ -28,3 +28,12 @@ R3-124). **Nothing here is removed** — dim-4 is *flag only*.
 
 **No `// DEAD-CANDIDATE` markers were added** — nothing is genuinely dead. Recorded
 explicitly so a later pass does not re-scan.
+
+## Deprecated in a declared window (R3-677, 2026-09-30)
+
+The nine bare `docLayout` path builders (`spacePath`, `memberPath`, `userSpacePath`,
+`appKeyPath`, `appSpacePath`, `userCountPath`, `appCountPath`, `memberKeysCollection`,
+`memberKeysDoc`) are `@deprecated` beside their `tenant*` twins, which emit the same path
+under `tenants/{tenantId}/` (TENANCY_SPEC §10 Phase 0). They still have live consumers and
+stay canonical until the Phase 4 cutover (R3-680), which removes them and flips the
+`'user-spaces'` → `tenants/` entry in `migration-transitions.json` to `cutover`.
