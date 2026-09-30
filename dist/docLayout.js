@@ -26,7 +26,7 @@
 // browser. What both sides DO share is `assertAppKeySegment` — the one property
 // a wrong path would violate. Unifying the ref construction is tracked debt.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.memberKeysDoc = exports.memberKeysCollection = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.tenantMemberKeysDoc = exports.tenantMemberKeysCollection = exports.tenantAppCountPath = exports.tenantUserCountPath = exports.tenantAppSpacePath = exports.tenantAppKeyPath = exports.tenantUserSpacePath = exports.tenantMemberPath = exports.tenantSpacePath = exports.tenantDisplayPath = exports.tenantPath = exports.tenantOf = exports.assertTenantId = exports.InvalidTenantIdError = exports.PLATFORM_TENANT = exports.PUBLIC_TENANT = exports.TENANTS_COLLECTION = exports.memberKeysDoc = exports.memberKeysCollection = exports.appCountPath = exports.userCountPath = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -141,32 +141,38 @@ class InvalidAppKeyError extends Error {
     }
 }
 exports.InvalidAppKeyError = InvalidAppKeyError;
-/** Is `appKey` usable as exactly one Firestore path segment? Empty, `/`-bearing,
- *  and the two relative-path doc-ids Firestore reserves are all refused. */
-const isAppKeySegment = (appKey) => typeof appKey === 'string' &&
-    appKey.length > 0 &&
-    !appKey.includes('/') &&
-    appKey !== '.' &&
-    appKey !== '..';
+/** Why `value` is not exactly one Firestore path segment, or `null` when it is — the ONE
+ *  statement of the segment rule both the appKey and the tenant-id guards apply. Empty,
+ *  `/`-bearing, and the two relative-path doc-ids Firestore reserves are all refused. */
+const segmentProblem = (value) => {
+    if (typeof value !== 'string' || value.length === 0)
+        return 'empty';
+    if (value.includes('/'))
+        return 'contains "/"';
+    if (value === '.' || value === '..')
+        return 'is a reserved relative path';
+    return null;
+};
+/** Is `appKey` usable as exactly one Firestore path segment? */
+const isAppKeySegment = (appKey) => segmentProblem(appKey) === null;
 exports.isAppKeySegment = isAppKeySegment;
 /** Refuse an `appKey` that is not one path segment — the shared chokepoint every
  *  grant-store path builder runs first (R3-285). Returns the key so it can wrap a
  *  segment in place. */
 const assertAppKeySegment = (appKey) => {
-    if (typeof appKey !== 'string' || appKey.length === 0) {
-        throw new InvalidAppKeyError(String(appKey), 'empty');
-    }
-    if (appKey.includes('/'))
-        throw new InvalidAppKeyError(appKey, 'contains "/"');
-    if (appKey === '.' || appKey === '..') {
-        throw new InvalidAppKeyError(appKey, 'is a reserved relative path');
-    }
+    const problem = segmentProblem(appKey);
+    if (problem !== null)
+        throw new InvalidAppKeyError(problem === 'empty' ? String(appKey) : appKey, problem);
     return appKey;
 };
 exports.assertAppKeySegment = assertAppKeySegment;
 // --- document paths (pure, sentinel-free) -----------------------------------
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantSpacePath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const spacePath = (spaceId) => ['spaces', spaceId];
 exports.spacePath = spacePath;
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantMemberPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const memberPath = (spaceId, grantee) => [
     'spaces',
     spaceId,
@@ -174,6 +180,8 @@ const memberPath = (spaceId, grantee) => [
     grantee,
 ];
 exports.memberPath = memberPath;
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantUserSpacePath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const userSpacePath = (uid, spaceId) => [
     'user-spaces',
     uid,
@@ -181,6 +189,8 @@ const userSpacePath = (uid, spaceId) => [
     spaceId,
 ];
 exports.userSpacePath = userSpacePath;
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantAppKeyPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const appKeyPath = (uid, appKey) => [
     'user-app-spaces',
     uid,
@@ -192,7 +202,9 @@ exports.appKeyPath = appKeyPath;
  *  doc. R3-98 S5: the doc-id is principal-qualified — pass the QUALIFYING named
  *  principal for `${principal}~${spaceId}`, or omit it (stage / legacy) for the
  *  bare `spaceId`. Backward-compatible: a 3-arg call (no principal) yields exactly
- *  the pre-S5 path, so the backend/CLI stage mint is byte-identical. */
+ *  the pre-S5 path, so the backend/CLI stage mint is byte-identical.
+ *  @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path.
+ *  Use {@link tenantAppSpacePath}. Removed at the Phase 4 cutover. */
 const appSpacePath = (uid, appKey, spaceId, qualifyingPrincipal) => [
     'user-app-spaces',
     uid,
@@ -202,8 +214,12 @@ const appSpacePath = (uid, appKey, spaceId, qualifyingPrincipal) => [
     (0, exports.grantDocId)(spaceId, qualifyingPrincipal),
 ];
 exports.appSpacePath = appSpacePath;
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantUserCountPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const userCountPath = (uid) => ['space-counts', uid];
 exports.userCountPath = userCountPath;
+/** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
+ *  {@link tenantAppCountPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 const appCountPath = (uid, appKey) => [
     'space-counts',
     uid,
@@ -231,7 +247,8 @@ exports.appCountPath = appCountPath;
 // variable, and a rule that parses a doc id to recover the writer is a rule
 // someone can get wrong.
 /** `spaces/{spaceId}/memberKeys/{uid}/published` — the collection holding one
- *  member's published public-key entries (odd segment count ⇒ collection). */
+ *  member's published public-key entries (odd segment count ⇒ collection).
+ *  @deprecated TENANCY_SPEC §10 transition window (R3-677): use {@link tenantMemberKeysCollection}. */
 const memberKeysCollection = (spaceId, uid) => [
     ...(0, exports.spacePath)(spaceId),
     'memberKeys',
@@ -241,12 +258,102 @@ const memberKeysCollection = (spaceId, uid) => [
 exports.memberKeysCollection = memberKeysCollection;
 /** `spaces/{spaceId}/memberKeys/{uid}/published/{kid}` — one member's one
  *  published public key (even segment count ⇒ document). Write-once per `kid`
- *  (append-only, §6.1); readable by every space member. */
+ *  (append-only, §6.1); readable by every space member.
+ *  @deprecated TENANCY_SPEC §10 transition window (R3-677): use {@link tenantMemberKeysDoc}. */
 const memberKeysDoc = (spaceId, uid, kid) => [
     ...(0, exports.memberKeysCollection)(spaceId, uid),
     kid,
 ];
 exports.memberKeysDoc = memberKeysDoc;
+// --- the tenant layout (TENANCY_SPEC §3.2 / §6.2, R3-677 — Phase 0, additive) ----
+//
+// Every path gains a `tenants/{tenantId}/` prefix, so cross-tenant leakage needs a wrong
+// PATH rather than a forgotten `where` clause. Phase 0 only makes the names exist: the
+// bare builders above stay canonical and nothing reads or writes these yet (Phases 1–4,
+// R3-678…680). Each tenant builder is its bare twin behind the prefix, so the collection
+// literal still lives once — above — and the two layouts cannot drift beneath it.
+//
+// There is NO default tenant (R-TN-13): a builder called without one throws, because a
+// default is how a server-only write lands in `public` by accident. The caller derives
+// the tenant from a verified token (`tenantOf`) and from nothing else (R-TN-2).
+/** The top-level collection every tenant-layout path begins with (R-TN-1). */
+exports.TENANTS_COLLECTION = 'tenants';
+/** The public site's tenant: the project's default identity pool, whose tokens carry no
+ *  tenant claim (R-TN-3). */
+exports.PUBLIC_TENANT = 'public';
+/** The reserved tenant the IP-keyed pre-auth limiter buckets live under — no user, no
+ *  pool, default-deny to clients (R-TN-13). A named constant, never a default. */
+exports.PLATFORM_TENANT = '_platform';
+/** Thrown when a tenant id is not one Firestore path segment. */
+class InvalidTenantIdError extends Error {
+    code = 'invalid-tenant-id';
+    constructor(tenantId, why) {
+        super(`tenantId ${JSON.stringify(tenantId)} is not one Firestore path segment (${why}).`);
+        this.name = 'InvalidTenantIdError';
+    }
+}
+exports.InvalidTenantIdError = InvalidTenantIdError;
+/** Refuse a tenant id that is absent or not exactly one path segment — the chokepoint
+ *  every tenant builder runs first. A missing tenant is an error, never `public`. */
+const assertTenantId = (tenantId) => {
+    const problem = segmentProblem(tenantId);
+    if (problem === 'empty')
+        throw new InvalidTenantIdError(tenantId, 'missing — there is no default tenant (R-TN-13)');
+    if (problem !== null)
+        throw new InvalidTenantIdError(tenantId, problem);
+    return tenantId;
+};
+exports.assertTenantId = assertTenantId;
+/** The tenant a verified token belongs to: its `firebase.tenant` claim, else
+ *  {@link PUBLIC_TENANT} (R-TN-3, R-TN-8 — the claim IS the tenant id). Pass the decoded
+ *  ID token's claims (backend) or the signed-in user's token claims (host); one mapping
+ *  here so the two cannot disagree about what absence means. */
+const tenantOf = (claims) => {
+    // Typed as loosely as the real producers: the host's firebase/auth `ParsedToken.firebase`
+    // declares no `tenant` key at all, and the admin `DecodedIdToken.firebase` declares one.
+    const tenant = claims?.firebase?.tenant;
+    // Exactly the rules' `token.get('firebase', {}).get('tenant', 'public')`: only ABSENCE
+    // is public. A present claim is taken as-is and must be a valid segment — an empty or
+    // non-string one (which Firebase never issues) throws here rather than quietly
+    // becoming `public`, where the rules would have denied it.
+    return tenant === undefined ? exports.PUBLIC_TENANT : (0, exports.assertTenantId)(tenant);
+};
+exports.tenantOf = tenantOf;
+/** `tenants/{tenantId}` — the tenant record (§5; backend-written only, no client read). */
+const tenantPath = (tenantId) => [exports.TENANTS_COLLECTION, (0, exports.assertTenantId)(tenantId)];
+exports.tenantPath = tenantPath;
+/** `tenants/{tenantId}/meta/display` — what chrome needs, readable by the tenant's own
+ *  signed-in users (R-TN-10). */
+const tenantDisplayPath = (tenantId) => [...(0, exports.tenantPath)(tenantId), 'meta', 'display'];
+exports.tenantDisplayPath = tenantDisplayPath;
+const underTenant = (tenantId, bare) => [...(0, exports.tenantPath)(tenantId), ...bare];
+/** `tenants/{tenantId}/spaces/{spaceId}` */
+const tenantSpacePath = (tenantId, spaceId) => underTenant(tenantId, (0, exports.spacePath)(spaceId));
+exports.tenantSpacePath = tenantSpacePath;
+/** `tenants/{tenantId}/spaces/{spaceId}/members/{grantee}` */
+const tenantMemberPath = (tenantId, spaceId, grantee) => underTenant(tenantId, (0, exports.memberPath)(spaceId, grantee));
+exports.tenantMemberPath = tenantMemberPath;
+/** `tenants/{tenantId}/user-spaces/{uid}/spaces/{spaceId}` */
+const tenantUserSpacePath = (tenantId, uid, spaceId) => underTenant(tenantId, (0, exports.userSpacePath)(uid, spaceId));
+exports.tenantUserSpacePath = tenantUserSpacePath;
+/** `tenants/{tenantId}/user-app-spaces/{uid}/apps/{appKey}` */
+const tenantAppKeyPath = (tenantId, uid, appKey) => underTenant(tenantId, (0, exports.appKeyPath)(uid, appKey));
+exports.tenantAppKeyPath = tenantAppKeyPath;
+/** `tenants/{tenantId}/user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` */
+const tenantAppSpacePath = (tenantId, uid, appKey, spaceId, qualifyingPrincipal) => underTenant(tenantId, (0, exports.appSpacePath)(uid, appKey, spaceId, qualifyingPrincipal));
+exports.tenantAppSpacePath = tenantAppSpacePath;
+/** `tenants/{tenantId}/space-counts/{uid}` */
+const tenantUserCountPath = (tenantId, uid) => underTenant(tenantId, (0, exports.userCountPath)(uid));
+exports.tenantUserCountPath = tenantUserCountPath;
+/** `tenants/{tenantId}/space-counts/{uid}/apps/{appKey}` */
+const tenantAppCountPath = (tenantId, uid, appKey) => underTenant(tenantId, (0, exports.appCountPath)(uid, appKey));
+exports.tenantAppCountPath = tenantAppCountPath;
+/** `tenants/{tenantId}/spaces/{spaceId}/memberKeys/{uid}/published` */
+const tenantMemberKeysCollection = (tenantId, spaceId, uid) => underTenant(tenantId, (0, exports.memberKeysCollection)(spaceId, uid));
+exports.tenantMemberKeysCollection = tenantMemberKeysCollection;
+/** `tenants/{tenantId}/spaces/{spaceId}/memberKeys/{uid}/published/{kid}` */
+const tenantMemberKeysDoc = (tenantId, spaceId, uid, kid) => underTenant(tenantId, (0, exports.memberKeysDoc)(spaceId, uid, kid));
+exports.tenantMemberKeysDoc = tenantMemberKeysDoc;
 // --- field objects (inject the timestamp/increment sentinels) ---------------
 /** `spaces/{spaceId}` — the root doc (written WITHOUT merge). */
 const spaceDocFields = (params, s) => (0, exports.defined)({

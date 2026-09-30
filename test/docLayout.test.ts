@@ -40,6 +40,7 @@ import {
   userSpacePath,
   type MintSentinels,
 } from '../src/docLayout';
+import * as L from '../src/docLayout';
 
 const TS = '<<server-timestamp>>';
 const sentinels: MintSentinels = {
@@ -334,5 +335,98 @@ describe('docLayout — the appKey must be one path segment (R3-285)', () => {
       expect((e as Error).message).toContain('provider__namespace__repository');
       expect((e as Error).message).toContain('provider:namespace/repository');
     }
+  });
+});
+
+// --- R3-677 / TENANCY_SPEC §3.2, §6.2 — the tenant layout (Phase 0) -------------
+//
+// The real producer of each expected tail is the BARE builder, not a literal: a tenant
+// builder must be its bare twin behind `tenants/{tenantId}/`, so the two layouts cannot
+// drift beneath the prefix.
+describe('tenant layout (R3-677)', () => {
+  const pairs: [string, (t: string) => string[], () => string[]][] = [
+    ['space', (t) => L.tenantSpacePath(t, 's1'), () => L.spacePath('s1')],
+    ['member', (t) => L.tenantMemberPath(t, 's1', 'user:u'), () => L.memberPath('s1', 'user:u')],
+    ['user-space', (t) => L.tenantUserSpacePath(t, 'u', 's1'), () => L.userSpacePath('u', 's1')],
+    ['app-key', (t) => L.tenantAppKeyPath(t, 'u', 'gh__a__b'), () => L.appKeyPath('u', 'gh__a__b')],
+    ['app-space', (t) => L.tenantAppSpacePath(t, 'u', 'gh__a__b', 's1'), () => L.appSpacePath('u', 'gh__a__b', 's1')],
+    [
+      'app-space (principal-qualified)',
+      (t) => L.tenantAppSpacePath(t, 'u', 'gh__a__b', 's1', 'notes.app'),
+      () => L.appSpacePath('u', 'gh__a__b', 's1', 'notes.app'),
+    ],
+    ['user-count', (t) => L.tenantUserCountPath(t, 'u'), () => L.userCountPath('u')],
+    ['app-count', (t) => L.tenantAppCountPath(t, 'u', 'gh__a__b'), () => L.appCountPath('u', 'gh__a__b')],
+    [
+      'member-keys collection',
+      (t) => L.tenantMemberKeysCollection(t, 's1', 'u'),
+      () => L.memberKeysCollection('s1', 'u'),
+    ],
+    ['member-keys doc', (t) => L.tenantMemberKeysDoc(t, 's1', 'u', 'k1'), () => L.memberKeysDoc('s1', 'u', 'k1')],
+  ];
+
+  it.each(pairs)('%s: tenants/public/ + exactly the bare path', (_name, tenant, bare) => {
+    const p = tenant(L.PUBLIC_TENANT);
+    expect(p.slice(0, 2)).toEqual(['tenants', 'public']);
+    expect(p.slice(2)).toEqual(bare());
+  });
+
+  it.each(pairs)('%s: a missing or empty tenant throws — there is no default (R-TN-13)', (_name, tenant) => {
+    expect(() => tenant('')).toThrow(L.InvalidTenantIdError);
+    expect(() => tenant(undefined as unknown as string)).toThrow(/no default tenant/);
+  });
+
+  it('refuses a tenant id that is not one path segment', () => {
+    for (const bad of ['a/b', '.', '..']) expect(() => L.tenantSpacePath(bad, 's1')).toThrow(L.InvalidTenantIdError);
+  });
+
+  it('the record and its display doc sit at the tenant root (§5, R-TN-10)', () => {
+    expect(L.tenantPath('acme')).toEqual(['tenants', 'acme']);
+    expect(L.tenantDisplayPath('acme')).toEqual(['tenants', 'acme', 'meta', 'display']);
+    expect(L.tenantPath(L.PLATFORM_TENANT)).toEqual(['tenants', '_platform']);
+  });
+
+  it('tenantOf: the claim is the tenant; absence (the default pool) is public (R-TN-3, R-TN-8)', () => {
+    expect(L.tenantOf({ firebase: { tenant: 'acme-x1' } })).toBe('acme-x1');
+    expect(L.tenantOf({ firebase: {} })).toBe(L.PUBLIC_TENANT);
+    expect(L.tenantOf({})).toBe(L.PUBLIC_TENANT);
+    expect(L.tenantOf(null)).toBe(L.PUBLIC_TENANT);
+    // Only ABSENCE is public, exactly as the rules' `.get('tenant', 'public')`. A present
+    // empty or non-string claim (never issued by Firebase) throws rather than becoming
+    // `public`, where the rules would have denied it — the two must not disagree.
+    expect(() => L.tenantOf({ firebase: { tenant: '' } })).toThrow(L.InvalidTenantIdError);
+    expect(() => L.tenantOf({ firebase: { tenant: 42 } })).toThrow(L.InvalidTenantIdError);
+    expect(() => L.tenantOf({ firebase: { tenant: 'a/b' } })).toThrow(L.InvalidTenantIdError);
+  });
+});
+
+// R3-677 review round 1 — `tenantOf` must accept the REAL claims types, not only object
+// literals. firebase/auth's `ParsedToken.firebase` declares no `tenant` key (its shape is
+// `{ sign_in_provider?, sign_in_second_factor?, identities? }`), which a parameter typed
+// `{ firebase?: { tenant?: unknown } }` rejected at compile time. This value is typed
+// exactly as that producer's declaration; the test compiling is half the assertion.
+describe('tenantOf accepts the host and backend claims types (R3-677)', () => {
+  interface HostParsedTokenShape {
+    firebase?: {
+      sign_in_provider?: string;
+      sign_in_second_factor?: string;
+      identities?: Record<string, string>;
+    };
+    [key: string]: unknown;
+  }
+  interface BackendDecodedShape {
+    uid: string;
+    firebase: { identities: Record<string, unknown>; sign_in_provider: string; tenant?: string };
+  }
+  it('a host ParsedToken-shaped value (no tenant key in its type) maps to public', () => {
+    const host: HostParsedTokenShape = { firebase: { sign_in_provider: 'custom' } };
+    expect(L.tenantOf(host)).toBe(L.PUBLIC_TENANT);
+  });
+  it('a backend DecodedIdToken-shaped value carries its tenant through', () => {
+    const decoded: BackendDecodedShape = {
+      uid: 'u',
+      firebase: { identities: {}, sign_in_provider: 'custom', tenant: 'acme-x1' },
+    };
+    expect(L.tenantOf(decoded)).toBe('acme-x1');
   });
 });

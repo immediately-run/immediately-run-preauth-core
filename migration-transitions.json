@@ -5,6 +5,12 @@
       "new": "granteeId",
       "status": "cutover",
       "note": "RENAME-1 (R3-124 / SPEC_CODE_DEBT §7.1). The deprecated userPrincipal alias is removed here; granteeId is canonical. No consumer imported userPrincipal (drained), so this cutover lands independently. See docs/context/cross_repo_migration.md."
+    },
+    {
+      "old": "export const userSpacePath =",
+      "new": "export const tenantUserSpacePath =",
+      "status": "dual-read",
+      "note": "R3-677 / TENANCY_SPEC §10 Phase 0: the tenant-prefix migration. docLayout's bare builders are @deprecated beside their tenant twins (tenantSpacePath et al., emitting tenants/{tenantId}/…); nothing reads or writes the tenant layout yet. Phases 1–4 are R3-678…680; the cutover removes the bare builders and flips this entry. The tokens are the two builders' declarations, so the check reads code, not comments; they stand for the set (one of nine), since the generic nudge sees token presence only — the tenancy-specific check is Phase 3's."
     }
   ]
 }

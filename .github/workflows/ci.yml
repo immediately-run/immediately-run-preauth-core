@@ -31,6 +31,8 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run lint
+      # R3-677: the cross-repo rename nudge (copied from docs, which CI cannot read).
+      - run: npm run check:rename
       - name: Publish to npm via trusted publishing (skip if version already published)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
