@@ -399,3 +399,34 @@ describe('tenant layout (R3-677)', () => {
     expect(() => L.tenantOf({ firebase: { tenant: 'a/b' } })).toThrow(L.InvalidTenantIdError);
   });
 });
+
+// R3-677 review round 1 — `tenantOf` must accept the REAL claims types, not only object
+// literals. firebase/auth's `ParsedToken.firebase` declares no `tenant` key (its shape is
+// `{ sign_in_provider?, sign_in_second_factor?, identities? }`), which a parameter typed
+// `{ firebase?: { tenant?: unknown } }` rejected at compile time. This value is typed
+// exactly as that producer's declaration; the test compiling is half the assertion.
+describe('tenantOf accepts the host and backend claims types (R3-677)', () => {
+  interface HostParsedTokenShape {
+    firebase?: {
+      sign_in_provider?: string;
+      sign_in_second_factor?: string;
+      identities?: Record<string, string>;
+    };
+    [key: string]: unknown;
+  }
+  interface BackendDecodedShape {
+    uid: string;
+    firebase: { identities: Record<string, unknown>; sign_in_provider: string; tenant?: string };
+  }
+  it('a host ParsedToken-shaped value (no tenant key in its type) maps to public', () => {
+    const host: HostParsedTokenShape = { firebase: { sign_in_provider: 'custom' } };
+    expect(L.tenantOf(host)).toBe(L.PUBLIC_TENANT);
+  });
+  it('a backend DecodedIdToken-shaped value carries its tenant through', () => {
+    const decoded: BackendDecodedShape = {
+      uid: 'u',
+      firebase: { identities: {}, sign_in_provider: 'custom', tenant: 'acme-x1' },
+    };
+    expect(L.tenantOf(decoded)).toBe('acme-x1');
+  });
+});

@@ -36,4 +36,4 @@ The nine bare `docLayout` path builders (`spacePath`, `memberPath`, `userSpacePa
 `memberKeysDoc`) are `@deprecated` beside their `tenant*` twins, which emit the same path
 under `tenants/{tenantId}/` (TENANCY_SPEC §10 Phase 0). They still have live consumers and
 stay canonical until the Phase 4 cutover (R3-680), which removes them and flips the
-`'user-spaces'` → `tenants/` entry in `migration-transitions.json` to `cutover`.
+`userSpacePath` → `tenantUserSpacePath` declaration entry in `migration-transitions.json` to `cutover`.
