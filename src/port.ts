@@ -80,7 +80,14 @@ export interface GrantSpaceParams {
   /** R3-98 S3/S4 — the **named principal** this grant is minted under (design 05a
    *  §3.1). Written as the `principal` field so the mount-admission gate re-checks
    *  it (a grant fires only under the principal it was minted with). Optional +
-   *  additive: omitted ⇒ no field ⇒ a legacy/grandfathered grant. */
+   *  additive: omitted ⇒ no field ⇒ a legacy/grandfathered grant.
+   *
+   *  R3-692: `mintConsentedGrants` now passes the RAW frame principal here whenever its
+   *  caller gives one (a stage mint then carries `principal: 'stage'`, not no field).
+   *  ADAPTER CONTRACT, as on {@link GrantNetFetchParams.principal}: an adapter that
+   *  cannot store it MUST NOT write the grant bare (a bare grant is grandfathered under
+   *  every principal); `mintConsentedGrants` only hands a principal to a store that
+   *  sets {@link MintStore.principalKeyedConsent}. */
   principal?: string;
 }
 
@@ -90,6 +97,17 @@ export interface GrantNetFetchParams {
   uid: string;
   appKey: string;
   hosts: readonly NetFetchHost[];
+  /** R3-692 — the RAW principal of the frame this consent was given in (the
+   *  space-grant principal, e.g. `stage` or `editor.tools`). The ADAPTER qualifies it
+   *  (stage / legacy / undefined ⇒ the bare `apps/{appKey}` doc; a qualifying named
+   *  principal P ⇒ `apps/{appKey}/consents/{P}`, see `appConsentPath`). Omitted ⇒
+   *  the stage, exactly the 0.2.0 call shape.
+   *
+   *  ADAPTER CONTRACT: an adapter that cannot store principal-keyed consent MUST
+   *  throw when given a principal — it must NEVER write the grant bare, because a
+   *  bare record is the stage's consent and would lift a named principal's grant
+   *  onto every stage frame of the app. */
+  principal?: string;
 }
 
 /** Parameters for `MintStore.grantAppCapabilities` — the durable §8.7 grant of a
@@ -104,6 +122,17 @@ export interface GrantAppCapabilitiesParams {
   capabilities: readonly string[];
   /** §8.15 provenance; defaults to `interactive` when omitted. */
   mintPath?: MintPath;
+  /** R3-692 — the RAW principal of the frame this consent was given in (the
+   *  space-grant principal, e.g. `stage` or `editor.tools`). The ADAPTER qualifies it
+   *  (stage / legacy / undefined ⇒ the bare `apps/{appKey}` doc; a qualifying named
+   *  principal P ⇒ `apps/{appKey}/consents/{P}`, see `appConsentPath`). Omitted ⇒
+   *  the stage, exactly the 0.2.0 call shape.
+   *
+   *  ADAPTER CONTRACT: an adapter that cannot store principal-keyed consent MUST
+   *  throw when given a principal — it must NEVER write the grant bare, because a
+   *  bare record is the stage's consent and would lift a named principal's grant
+   *  onto every stage frame of the app. */
+  principal?: string;
 }
 
 /**
@@ -117,7 +146,9 @@ export interface MintStore {
   createSpace(params: CreateSpaceParams): Promise<string>;
   /** Record the durable §8.7 grant binding `spaceId` to `appKey` for `uid`. */
   grantSpaceToApp(params: GrantSpaceParams): Promise<void>;
-  /** Union the given net:fetch hosts into the app's consented host set. */
+  /** Union the given net:fetch hosts into the app's consented host set — the set
+   *  of the given `principal` (R3-692; see {@link GrantNetFetchParams.principal} for
+   *  the throw-never-write-bare contract). */
   grantNetFetchHosts(params: GrantNetFetchParams): Promise<void>;
   /** Union the given PLAIN app-scoped capabilities into the app's granted set
    *  (R3-233). **Optional** so existing {@link MintStore} implementers (the backend
@@ -126,4 +157,12 @@ export interface MintStore {
    *  `capabilitiesOk:false`) rather than silently dropping them — the exact
    *  validate-then-drop bug R3-233 fixes. */
   grantAppCapabilities?(params: GrantAppCapabilitiesParams): Promise<void>;
+  /** R3-692 — the adapter stores principal-keyed consent: it honours `principal` on
+   *  {@link GrantNetFetchParams}, {@link GrantAppCapabilitiesParams} AND
+   *  {@link GrantSpaceParams}. `mintConsentedGrants` refuses to hand a principal to a
+   *  store without this marker (that mint fails closed through `onError`), because a
+   *  0.2.0-shaped adapter would destructure the params, drop `principal`, and write the
+   *  mint at the bare (stage) key — the cross-principal bleed R3-692 closes. Opt-in,
+   *  so the TypeScript shape alone can never vouch for an adapter. */
+  readonly principalKeyedConsent?: true;
 }

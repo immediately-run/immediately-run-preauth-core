@@ -280,4 +280,21 @@ describe('applyPreAuth (M1 write path)', () => {
     });
     expect(calls.some((c) => c.method === 'grantAppCapabilities')).toBe(false);
   });
+
+  // R3-692: M1 policy grants are the stage's — every mint reaches the store with no
+  // `principal` key at all (not even `principal: undefined`), so the adapter writes
+  // the bare app doc exactly as 0.2.0 did.
+  it('applyPreAuth mints with no principal (policy = stage)', async () => {
+    const store = fakeStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['net:fetch', 'task:invoke'],
+      mounts: [create],
+      netFetchHosts: [host('https://api.example.com')],
+    });
+    expect(res.ok).toBe(true);
+    expect(calls.map((c) => c.method)).toEqual([
+      'grantNetFetchHosts', 'grantAppCapabilities', 'createSpace', 'grantSpaceToApp',
+    ]);
+    for (const c of calls) expect(Object.keys(c.args as object)).not.toContain('principal');
+  });
 });

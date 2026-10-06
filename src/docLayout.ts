@@ -106,7 +106,9 @@ export const GRANT_DOCID_DELIM = '~';
  *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
  *  builder with no sentinel knowledge. */
 export const grantDocId = (spaceId: string, qualifyingPrincipal?: string): string =>
-  qualifyingPrincipal ? `${qualifyingPrincipal}${GRANT_DOCID_DELIM}${spaceId}` : spaceId;
+  qualifyingPrincipal
+    ? `${assertPrincipalSegment(qualifyingPrincipal)}${GRANT_DOCID_DELIM}${spaceId}`
+    : spaceId;
 
 /** A parsed grant doc-id — the §3.5 reader-parse discipline. `principal` is set
  *  only for a QUALIFIED (`${principal}~${spaceId}`) id; a bare id (a stage/legacy
@@ -257,6 +259,73 @@ export const appSpacePath = (
   'spaces',
   grantDocId(spaceId, qualifyingPrincipal),
 ];
+// --- R3-692 — principal-keyed consent (net:fetch hosts + plain capabilities) ----
+//
+// Consent is keyed by (user, appKey, principal). The STAGE (and a legacy/unkeyed
+// grant, or no principal at all) keeps its consent on the app doc itself —
+// `user-app-spaces/{uid}/apps/{appKey}` — so no existing record moves. A QUALIFYING
+// named principal P keeps the SAME field set (`netFetch*`, `grantedCapabilities`,
+// `capabilities*`, `held`) on the sub-document `apps/{appKey}/consents/{P}`.
+//
+// Why a sub-document: a principal-qualified appKey doc id would pollute the `apps`
+// enumeration (listings, the §8.11 audit view, the namespace sweep); principal ids
+// contain dots, so they cannot be map-field keys; and the field builders below are
+// reused byte for byte. A writer of `consents/{P}` also merges `appKeyTouchFields`
+// onto the parent `apps/{appKey}` so the enumerations still see the app.
+//
+// GRAMMAR ONLY, like `grantDocId`: the caller decides which principals qualify (site-
+// main maps stage/legacy → undefined). Nothing is ever copied from the app doc into
+// `consents/{P}`: a named principal with no consent doc re-prompts.
+
+/** The sub-collection under `apps/{appKey}` that holds one consent doc per qualifying
+ *  named principal (R3-692). */
+export const CONSENTS_COLLECTION = 'consents';
+
+/** Thrown when a consent principal is not one Firestore path segment. Carries a
+ *  machine `code` so a caller can map it to its own error vocabulary. */
+export class InvalidPrincipalSegmentError extends Error {
+  readonly code = 'invalid-principal';
+  constructor(principal: unknown, why: string) {
+    super(`principal ${JSON.stringify(principal)} is not one Firestore path segment (${why}).`);
+    this.name = 'InvalidPrincipalSegmentError';
+  }
+}
+
+/** The principal-id grammar (site-main PRINCIPALS registry, CA-3): a dotted chain of
+ *  lowercase-alphanumeric(-hyphen) segments. It excludes everything the grant-key and
+ *  doc-id compositions use as a delimiter or Firestore treats specially: `/`, `~`
+ *  ({@link GRANT_DOCID_DELIM}), `::` (the cascade key `${appKey}::${P}::net:fetch`),
+ *  uppercase, `.`/`..`, empty and `__…__`. */
+export const PRINCIPAL_ID_RE = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
+
+/** Refuse a principal that is not a principal id — the chokepoint every principal-
+ *  qualified builder runs ({@link appConsentPath}, {@link grantDocId}; R3-692), and what
+ *  the backend runs on a `principal` taken from a request body. Stricter than a path-
+ *  segment check: a `~`/`::`-bearing principal is one segment but would mis-split the
+ *  space-grant doc-id or the cascade key. Returns the principal so it can wrap a
+ *  segment in place. */
+export const assertPrincipalSegment = (principal: string): string => {
+  const problem = segmentProblem(principal);
+  if (problem !== null) throw new InvalidPrincipalSegmentError(principal, problem);
+  if (!PRINCIPAL_ID_RE.test(principal)) {
+    throw new InvalidPrincipalSegmentError(principal, 'not a principal id (lowercase, dotted)');
+  }
+  return principal;
+};
+
+/** The doc that holds one (user, appKey, principal)'s net:fetch + plain-capability
+ *  consent (R3-692). Pass the QUALIFYING named principal for
+ *  `user-app-spaces/{uid}/apps/{appKey}/consents/{P}`; omit it (stage / legacy / none)
+ *  for exactly {@link appKeyPath}. The appKey is asserted before the principal.
+ *  @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path.
+ *  Use {@link tenantAppConsentPath}. Removed at the Phase 4 cutover. */
+export const appConsentPath = (uid: string, appKey: string, qualifyingPrincipal?: string): DocPath => {
+  const app = appKeyPath(uid, appKey);
+  return qualifyingPrincipal === undefined
+    ? app
+    : [...app, CONSENTS_COLLECTION, assertPrincipalSegment(qualifyingPrincipal)];
+};
+
 /** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
  *  {@link tenantUserCountPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 export const userCountPath = (uid: string): DocPath => ['space-counts', uid];
@@ -393,6 +462,13 @@ export const tenantAppSpacePath = (
   spaceId: string,
   qualifyingPrincipal?: string,
 ): DocPath => underTenant(tenantId, appSpacePath(uid, appKey, spaceId, qualifyingPrincipal));
+/** `tenants/{tenantId}/user-app-spaces/{uid}/apps/{appKey}[/consents/{P}]` (R3-692) */
+export const tenantAppConsentPath = (
+  tenantId: string,
+  uid: string,
+  appKey: string,
+  qualifyingPrincipal?: string,
+): DocPath => underTenant(tenantId, appConsentPath(uid, appKey, qualifyingPrincipal));
 /** `tenants/{tenantId}/space-counts/{uid}` */
 export const tenantUserCountPath = (tenantId: string, uid: string): DocPath =>
   underTenant(tenantId, userCountPath(uid));

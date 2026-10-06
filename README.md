@@ -19,8 +19,53 @@ Spec: `UI_AS_APPS_SPEC.md` §8.9 (target check), §8.15 (M1 pre-authorization),
 | `capabilities` | The capability vocabulary — the **single source of truth** (`CAPABILITIES`, `isAppScoped` / `isBaseline` / `isKnownCapability`, the version gate). site-main re-exports it; the backend imports the same predicates. The §8.9 gate's correctness IS this classification, so there is exactly one. |
 | `port` | `MintStore` — the 3-method persistence port `mintConsentedGrants` calls (`createSpace`, `grantSpaceToApp`, `grantNetFetchHosts`) + its param/domain types (`GrantMode`, `MintPath`, `NetFetchHost`, …). |
 | `docLayout` | The byte-faithful Firestore **paths + field builders** (`grantKey`, `GRANT_EXPIRY_MS`, the grant/space/net-fetch document builders). The tenant layout (R3-677, TENANCY_SPEC §3.2): `tenant*` twins of every path builder emit `tenants/{tenantId}/…` with no default tenant; `tenantOf(claims)` maps a token to its tenant (absent claim → `PUBLIC_TENANT`); the bare builders are `@deprecated` for the migration window. Each store adapter injects only its SDK's timestamp/increment sentinels and does the raw `.set()`; drift is impossible without editing a helper both consume. |
-| `bootConsent` | `mintConsentedGrants` — the ONE mint path. Environment-neutral: a caller passes `onError` instead of the core logging with a host-specific prefix. |
+| `bootConsent` | `mintConsentedGrants` — the ONE mint path, keyed by an optional trailing consent `principal` (R3-692). Environment-neutral: a caller passes `onError` instead of the core logging with a host-specific prefix. |
 | `m1PreAuth` | `planPreAuthCapabilities` / `isPreAuthClean` (the pure §8.9 target check) + `applyPreAuth` (validate-then-mint, all-or-nothing). |
+
+## Consent layout: (user, appKey, principal) (R3-692)
+
+net:fetch host consent and plain-capability consent are keyed by the **principal** of
+the frame the consent was given in, not by the app alone. One appKey running as the
+stage and as a named-principal region (say `editor.tools`) holds two separate consents,
+and neither satisfies the other's gate.
+
+| Principal | Consent document | Cascade parent key (built by the consumer — site-main `netFetchGrantKey`, from R3-692's site-main leg) |
+|---|---|---|
+| stage, legacy (unkeyed), or none | `user-app-spaces/{uid}/apps/{appKey}` (unchanged) | `${appKey}::net:fetch` |
+| a qualifying named principal `P` | `user-app-spaces/{uid}/apps/{appKey}/consents/{P}` | `${appKey}::${P}::net:fetch` |
+
+Each has a tenant twin under `tenants/{tenantId}/`. Both documents carry the same field
+set: the builders here emit `netFetch`, `netFetchGrantedAt`, `netFetchLastUsedAt`,
+`grantedCapabilities`, `capabilitiesGrantedAt` and `capabilitiesLastUsedAt`, and the
+consumer writes `held` itself. A writer of `consents/{P}` also merges
+`appKeyTouchFields` onto the parent `apps/{appKey}`, so listings, the audit view and the
+namespace sweep still find the app.
+
+- **Builders:** `appConsentPath(uid, appKey, qualifyingPrincipal?)` and
+  `tenantAppConsentPath(tenantId, uid, appKey, qualifyingPrincipal?)`. With no principal
+  they return exactly `appKeyPath` / `tenantAppKeyPath`. `CONSENTS_COLLECTION` is
+  `'consents'`. `assertPrincipalSegment` refuses anything that is not a principal id
+  (`PRINCIPAL_ID_RE`, the PRINCIPALS registry's CA-3 grammar: lowercase dotted
+  segments), so `/`, `~`, `::`, uppercase, empty, `.`/`..` and `__…__` are all refused
+  with `InvalidPrincipalSegmentError` (`code: 'invalid-principal'`). `grantDocId` runs
+  the same check on a qualifying principal. The appKey is asserted first. These are grammar only:
+  the caller decides which principals qualify.
+- **Mint path:** `mintConsentedGrants(..., capabilities, principal?)` passes the **raw**
+  principal to `grantNetFetchHosts`, `grantAppCapabilities` and `grantSpaceToApp`. The
+  adapter qualifies it. The key is spread only when defined, so a call without a
+  principal produces exactly the 0.2.0 parameter objects. M1 `applyPreAuth` passes
+  none: a policy grant is the stage's.
+- **Adapter contract, enforced:** a store declares `principalKeyedConsent: true` when it
+  honours `principal` on all three grant methods. `mintConsentedGrants` hands a principal
+  only to such a store; for any other store each principal-carrying mint fails closed
+  (`onError`, `ok: false`) and nothing is written, because a 0.2.0-shaped adapter would
+  drop the field and write the grant bare, where the stage reads it.
+- **Release order:** a consumer sets the marker in the same change that makes its adapter
+  store principal-keyed consent, and only then passes a principal. Bumping to 0.3.0
+  alone changes nothing: without a principal every call is the 0.2.0 call.
+- **Migration:** nothing is copied. The stage reads the app doc as before. A named
+  principal reads only `consents/{P}`, which does not exist yet for any user, so it
+  re-prompts once.
 
 ## Published versions
 
