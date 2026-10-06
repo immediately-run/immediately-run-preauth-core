@@ -90,6 +90,17 @@ export interface GrantNetFetchParams {
   uid: string;
   appKey: string;
   hosts: readonly NetFetchHost[];
+  /** R3-692 — the RAW principal of the frame this consent was given in (the
+   *  space-grant principal, e.g. `stage` or `editor.tools`). The ADAPTER qualifies it
+   *  (stage / legacy / undefined ⇒ the bare `apps/{appKey}` doc; a qualifying named
+   *  principal P ⇒ `apps/{appKey}/consents/{P}`, see `appConsentPath`). Omitted ⇒
+   *  the stage, exactly the 0.2.0 call shape.
+   *
+   *  ADAPTER CONTRACT: an adapter that cannot store principal-keyed consent MUST
+   *  throw when given a principal — it must NEVER write the grant bare, because a
+   *  bare record is the stage's consent and would lift a named principal's grant
+   *  onto every stage frame of the app. */
+  principal?: string;
 }
 
 /** Parameters for `MintStore.grantAppCapabilities` — the durable §8.7 grant of a
@@ -104,6 +115,17 @@ export interface GrantAppCapabilitiesParams {
   capabilities: readonly string[];
   /** §8.15 provenance; defaults to `interactive` when omitted. */
   mintPath?: MintPath;
+  /** R3-692 — the RAW principal of the frame this consent was given in (the
+   *  space-grant principal, e.g. `stage` or `editor.tools`). The ADAPTER qualifies it
+   *  (stage / legacy / undefined ⇒ the bare `apps/{appKey}` doc; a qualifying named
+   *  principal P ⇒ `apps/{appKey}/consents/{P}`, see `appConsentPath`). Omitted ⇒
+   *  the stage, exactly the 0.2.0 call shape.
+   *
+   *  ADAPTER CONTRACT: an adapter that cannot store principal-keyed consent MUST
+   *  throw when given a principal — it must NEVER write the grant bare, because a
+   *  bare record is the stage's consent and would lift a named principal's grant
+   *  onto every stage frame of the app. */
+  principal?: string;
 }
 
 /**
@@ -117,7 +139,9 @@ export interface MintStore {
   createSpace(params: CreateSpaceParams): Promise<string>;
   /** Record the durable §8.7 grant binding `spaceId` to `appKey` for `uid`. */
   grantSpaceToApp(params: GrantSpaceParams): Promise<void>;
-  /** Union the given net:fetch hosts into the app's consented host set. */
+  /** Union the given net:fetch hosts into the app's consented host set — the set
+   *  of the given `principal` (R3-692; see {@link GrantNetFetchParams.principal} for
+   *  the throw-never-write-bare contract). */
   grantNetFetchHosts(params: GrantNetFetchParams): Promise<void>;
   /** Union the given PLAIN app-scoped capabilities into the app's granted set
    *  (R3-233). **Optional** so existing {@link MintStore} implementers (the backend

@@ -109,6 +109,27 @@ export declare const appKeyPath: (uid: string, appKey: string) => DocPath;
  *  @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path.
  *  Use {@link tenantAppSpacePath}. Removed at the Phase 4 cutover. */
 export declare const appSpacePath: (uid: string, appKey: string, spaceId: string, qualifyingPrincipal?: string) => DocPath;
+/** The sub-collection under `apps/{appKey}` that holds one consent doc per qualifying
+ *  named principal (R3-692). */
+export declare const CONSENTS_COLLECTION = "consents";
+/** Thrown when a consent principal is not one Firestore path segment. Carries a
+ *  machine `code` so a caller can map it to its own error vocabulary. */
+export declare class InvalidPrincipalSegmentError extends Error {
+    readonly code = "invalid-principal";
+    constructor(principal: unknown, why: string);
+}
+/** Refuse a principal that is not exactly one path segment — the chokepoint every
+ *  consent path builder runs on its principal (R3-692), and what the backend runs on
+ *  a `principal` taken from a request body. Returns the principal so it can wrap a
+ *  segment in place. */
+export declare const assertPrincipalSegment: (principal: string) => string;
+/** The doc that holds one (user, appKey, principal)'s net:fetch + plain-capability
+ *  consent (R3-692). Pass the QUALIFYING named principal for
+ *  `user-app-spaces/{uid}/apps/{appKey}/consents/{P}`; omit it (stage / legacy / none)
+ *  for exactly {@link appKeyPath}. The appKey is asserted before the principal.
+ *  @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path.
+ *  Use {@link tenantAppConsentPath}. Removed at the Phase 4 cutover. */
+export declare const appConsentPath: (uid: string, appKey: string, qualifyingPrincipal?: string) => DocPath;
 /** @deprecated TENANCY_SPEC §10 transition window (R3-677): the bare, un-prefixed path. Use
  *  {@link tenantUserCountPath} — the same path under `tenants/{tenantId}/`. Removed at the Phase 4 cutover. */
 export declare const userCountPath: (uid: string) => DocPath;
@@ -162,6 +183,8 @@ export declare const tenantUserSpacePath: (tenantId: string, uid: string, spaceI
 export declare const tenantAppKeyPath: (tenantId: string, uid: string, appKey: string) => DocPath;
 /** `tenants/{tenantId}/user-app-spaces/{uid}/apps/{appKey}/spaces/{docId}` */
 export declare const tenantAppSpacePath: (tenantId: string, uid: string, appKey: string, spaceId: string, qualifyingPrincipal?: string) => DocPath;
+/** `tenants/{tenantId}/user-app-spaces/{uid}/apps/{appKey}[/consents/{P}]` (R3-692) */
+export declare const tenantAppConsentPath: (tenantId: string, uid: string, appKey: string, qualifyingPrincipal?: string) => DocPath;
 /** `tenants/{tenantId}/space-counts/{uid}` */
 export declare const tenantUserCountPath: (tenantId: string, uid: string) => DocPath;
 /** `tenants/{tenantId}/space-counts/{uid}/apps/{appKey}` */

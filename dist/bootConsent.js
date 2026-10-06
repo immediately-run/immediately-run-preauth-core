@@ -34,12 +34,22 @@ async function mintConsentedGrants(store, uid, appKey, selections, netFetchHosts
  *  parameterized — granted via `netFetchHosts` above); the caller (`applyPreAuth`)
  *  filters host-parameterized caps out. Defaults to none, so existing callers that
  *  only mint mounts + hosts are unaffected. */
-capabilities = []) {
+capabilities = [], 
+/** R3-692 — the RAW principal of the frame the consent was given in (the space-
+ *  grant principal: `stage`, `editor.tools`, …). Threaded into the net:fetch,
+ *  capability AND space mints; each adapter qualifies it (stage / legacy ⇒ the
+ *  bare record). Spread ONLY when defined, so a call without it hands the store
+ *  exactly the 0.2.0 parameter objects (no `principal` key at all). M1
+ *  `applyPreAuth` never passes it: a policy grant is the stage's. */
+principal) {
+    // `{}` when absent — never `{ principal: undefined }`, which would change the
+    // params' key set (and a Firestore adapter that forwards fields would reject it).
+    const p = principal === undefined ? {} : { principal };
     let ok = true;
     let netFetchOk = true;
     if (netFetchHosts.length > 0) {
         try {
-            await store.grantNetFetchHosts({ uid, appKey, hosts: netFetchHosts });
+            await store.grantNetFetchHosts({ uid, appKey, hosts: netFetchHosts, ...p });
         }
         catch (err) {
             onError?.('net:fetch grant failed', err);
@@ -59,7 +69,7 @@ capabilities = []) {
         }
         else {
             try {
-                await store.grantAppCapabilities({ uid, appKey, capabilities, mintPath });
+                await store.grantAppCapabilities({ uid, appKey, capabilities, mintPath, ...p });
             }
             catch (err) {
                 onError?.('capability grant failed', err);
@@ -82,6 +92,7 @@ capabilities = []) {
                 mode: sel.mode,
                 declaredUri: sel.uri,
                 mintPath,
+                ...p,
             });
             minted.push({ selection: sel, spaceId });
         }

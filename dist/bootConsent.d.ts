@@ -50,4 +50,11 @@ export declare function mintConsentedGrants(store: MintStore, uid: string, appKe
  *  parameterized — granted via `netFetchHosts` above); the caller (`applyPreAuth`)
  *  filters host-parameterized caps out. Defaults to none, so existing callers that
  *  only mint mounts + hosts are unaffected. */
-capabilities?: readonly string[]): Promise<MintResult>;
+capabilities?: readonly string[], 
+/** R3-692 — the RAW principal of the frame the consent was given in (the space-
+ *  grant principal: `stage`, `editor.tools`, …). Threaded into the net:fetch,
+ *  capability AND space mints; each adapter qualifies it (stage / legacy ⇒ the
+ *  bare record). Spread ONLY when defined, so a call without it hands the store
+ *  exactly the 0.2.0 parameter objects (no `principal` key at all). M1
+ *  `applyPreAuth` never passes it: a policy grant is the stage's. */
+principal?: string): Promise<MintResult>;
