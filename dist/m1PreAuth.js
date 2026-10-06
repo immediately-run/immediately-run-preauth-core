@@ -68,6 +68,7 @@ exports.planPreAuthCapabilities = planPreAuthCapabilities;
 exports.applyPreAuth = applyPreAuth;
 const capabilities_1 = require("./capabilities");
 const bootConsent_1 = require("./bootConsent");
+const port_1 = require("./port");
 /**
  * The pure §8.9 target check: partition requested capability names into
  * {grantable app-scoped, baseline no-op, refused}. Order-independent; total.
@@ -159,6 +160,12 @@ async function applyPreAuth(store, uid, appKey, request, onError, hostVersion) {
     // rung they are excluded from the plain mint and minted nowhere. `netFetchHosts`
     // is the only parameter mint input this flow carries today.
     const plainCaps = plan.grantable.filter((c) => !(0, capabilities_1.isHostParameterized)(c));
-    const mint = await (0, bootConsent_1.mintConsentedGrants)(store, uid, appKey, request.mounts, request.netFetchHosts, 'policy', onError, plainCaps);
+    // R3-1019 — a policy mint is the STAGE's grant: stamp it so the write is keyed
+    // (`principal: 'stage'`) rather than principal-less (LEGACY_UNKEYED — grandfathered
+    // under every principal until R3-703's 2026-10-31 end date). Only a store that
+    // declares `principalKeyedConsent` may receive the field — `mintConsentedGrants`
+    // refuses a principal to any other (fail-closed), so an unmarked store keeps
+    // today's unstamped call.
+    const mint = await (0, bootConsent_1.mintConsentedGrants)(store, uid, appKey, request.mounts, request.netFetchHosts, 'policy', onError, plainCaps, store.principalKeyedConsent === true ? port_1.STAGE_PRINCIPAL : undefined);
     return { ok: mint.ok, refused: [], mint };
 }
