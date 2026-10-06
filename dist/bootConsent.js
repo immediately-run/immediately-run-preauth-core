@@ -40,7 +40,7 @@ capabilities = [],
  *  capability AND space mints; each adapter qualifies it (stage / legacy ⇒ the
  *  bare record). Spread ONLY when defined, so a call without it hands the store
  *  exactly the 0.2.0 parameter objects (no `principal` key at all). M1
- *  `applyPreAuth` passes {@link STAGE_PRINCIPAL} to a principal-keyed store
+ *  `applyPreAuth` passes `STAGE_PRINCIPAL` (port.ts) to a principal-keyed store
  *  (R3-1019: a policy grant is the stage's, and is stamped so it is keyed,
  *  not LEGACY_UNKEYED) and nothing to an unmarked one. */
 principal) {

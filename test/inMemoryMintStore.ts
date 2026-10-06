@@ -4,25 +4,31 @@
 // times) and keeps just enough state to read back what was minted.
 //
 // R3-692: every record is keyed by (uid, appKey, principal) — a consent minted
-// under one principal is invisible to a read under another. An absent principal
-// is its own key (the stage / 0.2.0 shape); this double does no stage/legacy
-// qualification (that is the real adapters' job), so a test that wants "stage"
-// passes nothing.
+// under one principal is invisible to a read under another. The STAGE principal
+// is the one exception, and it is production's rule, not a shortcut: a real
+// adapter qualifies 'stage' to the bare record (site-main
+// `qualifyingSpacePrincipal('stage') === undefined`), so a stage-stamped mint and
+// a 0.2.0 principal-less mint live at the SAME key. R3-1019: policy mints are
+// stamped 'stage', so a test that wants the stage's records passes STAGE_PRINCIPAL
+// — or nothing, the same key — and what it asserts beyond the key is the RECORD's
+// `principal` field ('stage' vs absent).
 
-import type {
-  CreateSpaceParams,
-  GrantAppCapabilitiesParams,
-  GrantNetFetchParams,
-  GrantSpaceParams,
-  MintStore,
-  NetFetchHost,
+import {
+  STAGE_PRINCIPAL,
+  type CreateSpaceParams,
+  type GrantAppCapabilitiesParams,
+  type GrantNetFetchParams,
+  type GrantSpaceParams,
+  type MintStore,
+  type NetFetchHost,
 } from '../src/port';
 import { mergeCapabilities, mergeNetFetchHosts } from '../src/docLayout';
 
 /** The (uid, appKey, principal) record key. JSON keeps an absent principal distinct
- *  from every string principal without inventing a sentinel. */
+ *  from every NAMED principal without inventing a sentinel; 'stage' qualifies to
+ *  absent, exactly as the real adapters' qualifyingPrincipal rule does. */
 const consentKey = (uid: string, appKey: string, principal?: string): string =>
-  JSON.stringify([uid, appKey, principal ?? null]);
+  JSON.stringify([uid, appKey, principal === STAGE_PRINCIPAL ? null : (principal ?? null)]);
 
 export interface MintedGrant {
   uid: string;
