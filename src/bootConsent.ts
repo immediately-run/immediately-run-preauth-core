@@ -79,9 +79,20 @@ export async function mintConsentedGrants(
   // `{}` when absent — never `{ principal: undefined }`, which would change the
   // params' key set (and a Firestore adapter that forwards fields would reject it).
   const p = principal === undefined ? {} : { principal };
+  // The throw-never-write-bare contract, enforced here rather than trusted (R3-692): a
+  // principal goes only to a store that declares it keys consent by principal. Any
+  // other store would silently write this principal's consent where the stage reads it,
+  // so each principal-carrying mint fails closed instead.
+  const unkeyed = principal !== undefined && store.principalKeyedConsent !== true;
+  const unkeyedError = () =>
+    new Error('this store does not key consent by principal (MintStore.principalKeyedConsent)');
   let ok = true;
   let netFetchOk = true;
-  if (netFetchHosts.length > 0) {
+  if (netFetchHosts.length > 0 && unkeyed) {
+    onError?.('net:fetch grant refused: principal-keyed consent unsupported by this store', unkeyedError());
+    ok = false;
+    netFetchOk = false;
+  } else if (netFetchHosts.length > 0) {
     try {
       await store.grantNetFetchHosts({ uid, appKey, hosts: netFetchHosts, ...p });
     } catch (err) {
@@ -95,7 +106,11 @@ export async function mintConsentedGrants(
   // exact validate-then-drop bug this fixes.
   let capabilitiesOk = true;
   if (capabilities.length > 0) {
-    if (!store.grantAppCapabilities) {
+    if (unkeyed) {
+      onError?.('capability grant refused: principal-keyed consent unsupported by this store', unkeyedError());
+      ok = false;
+      capabilitiesOk = false;
+    } else if (!store.grantAppCapabilities) {
       onError?.('capability grant unsupported by this store', new Error('grantAppCapabilities not implemented'));
       ok = false;
       capabilitiesOk = false;
@@ -111,6 +126,11 @@ export async function mintConsentedGrants(
   }
   const minted: MintResult['minted'] = [];
   for (const sel of selections) {
+    if (unkeyed) {
+      onError?.('space grant refused: principal-keyed consent unsupported by this store', unkeyedError());
+      ok = false;
+      continue;
+    }
     try {
       const spaceId =
         sel.kind === 'create'

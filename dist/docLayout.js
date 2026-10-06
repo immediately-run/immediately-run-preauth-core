@@ -26,8 +26,8 @@
 // browser. What both sides DO share is `assertAppKeySegment` — the one property
 // a wrong path would violate. Unifying the ref construction is tracked debt.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appSpaceGrantFields = exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.tenantMemberKeysDoc = exports.tenantMemberKeysCollection = exports.tenantAppCountPath = exports.tenantUserCountPath = exports.tenantAppConsentPath = exports.tenantAppSpacePath = exports.tenantAppKeyPath = exports.tenantUserSpacePath = exports.tenantMemberPath = exports.tenantSpacePath = exports.tenantDisplayPath = exports.tenantPath = exports.tenantOf = exports.assertTenantId = exports.InvalidTenantIdError = exports.PLATFORM_TENANT = exports.PUBLIC_TENANT = exports.TENANTS_COLLECTION = exports.memberKeysDoc = exports.memberKeysCollection = exports.appCountPath = exports.userCountPath = exports.appConsentPath = exports.assertPrincipalSegment = exports.InvalidPrincipalSegmentError = exports.CONSENTS_COLLECTION = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
-exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = void 0;
+exports.appKeyTouchFields = exports.appCountFields = exports.userCountFields = exports.ownerUserSpaceFields = exports.ownerMemberFields = exports.spaceDocFields = exports.tenantMemberKeysDoc = exports.tenantMemberKeysCollection = exports.tenantAppCountPath = exports.tenantUserCountPath = exports.tenantAppConsentPath = exports.tenantAppSpacePath = exports.tenantAppKeyPath = exports.tenantUserSpacePath = exports.tenantMemberPath = exports.tenantSpacePath = exports.tenantDisplayPath = exports.tenantPath = exports.tenantOf = exports.assertTenantId = exports.InvalidTenantIdError = exports.PLATFORM_TENANT = exports.PUBLIC_TENANT = exports.TENANTS_COLLECTION = exports.memberKeysDoc = exports.memberKeysCollection = exports.appCountPath = exports.userCountPath = exports.appConsentPath = exports.assertPrincipalSegment = exports.PRINCIPAL_ID_RE = exports.InvalidPrincipalSegmentError = exports.CONSENTS_COLLECTION = exports.appSpacePath = exports.appKeyPath = exports.userSpacePath = exports.memberPath = exports.spacePath = exports.assertAppKeySegment = exports.isAppKeySegment = exports.InvalidAppKeyError = exports.defined = exports.granteeId = exports.GRANT_EXPIRY_MS = exports.parseGrantDocId = exports.grantDocId = exports.GRANT_DOCID_DELIM = exports.parseGrantKey = exports.grantKeyWithPrincipal = exports.grantKey = void 0;
+exports.appCapabilitiesGrantFields = exports.mergeCapabilities = exports.netFetchGrantFields = exports.mergeNetFetchHosts = exports.appSpaceGrantFields = void 0;
 /** Stable per-user identifier for a grant `(appKey, spaceId)`, used as the value
  *  of a delegated grant's `parentGrantId`. `::` is delimiter-safe: `appKey` uses
  *  `__` separators and a Firestore `spaceId` is alphanumeric. */
@@ -76,7 +76,9 @@ exports.GRANT_DOCID_DELIM = '~';
  *  no principal) for the bare `spaceId`. The caller resolves "does this principal
  *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
  *  builder with no sentinel knowledge. */
-const grantDocId = (spaceId, qualifyingPrincipal) => qualifyingPrincipal ? `${qualifyingPrincipal}${exports.GRANT_DOCID_DELIM}${spaceId}` : spaceId;
+const grantDocId = (spaceId, qualifyingPrincipal) => qualifyingPrincipal
+    ? `${(0, exports.assertPrincipalSegment)(qualifyingPrincipal)}${exports.GRANT_DOCID_DELIM}${spaceId}`
+    : spaceId;
 exports.grantDocId = grantDocId;
 /** Parse a space-grant doc-id back into `{ principal?, spaceId }` — the §3.5
  *  reader-parse discipline every app-space-grant collection reader routes `d.id`
@@ -245,14 +247,25 @@ class InvalidPrincipalSegmentError extends Error {
     }
 }
 exports.InvalidPrincipalSegmentError = InvalidPrincipalSegmentError;
-/** Refuse a principal that is not exactly one path segment — the chokepoint every
- *  consent path builder runs on its principal (R3-692), and what the backend runs on
- *  a `principal` taken from a request body. Returns the principal so it can wrap a
+/** The principal-id grammar (site-main PRINCIPALS registry, CA-3): a dotted chain of
+ *  lowercase-alphanumeric(-hyphen) segments. It excludes everything the grant-key and
+ *  doc-id compositions use as a delimiter or Firestore treats specially: `/`, `~`
+ *  ({@link GRANT_DOCID_DELIM}), `::` (the cascade key `${appKey}::${P}::net:fetch`),
+ *  uppercase, `.`/`..`, empty and `__…__`. */
+exports.PRINCIPAL_ID_RE = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
+/** Refuse a principal that is not a principal id — the chokepoint every principal-
+ *  qualified builder runs ({@link appConsentPath}, {@link grantDocId}; R3-692), and what
+ *  the backend runs on a `principal` taken from a request body. Stricter than a path-
+ *  segment check: a `~`/`::`-bearing principal is one segment but would mis-split the
+ *  space-grant doc-id or the cascade key. Returns the principal so it can wrap a
  *  segment in place. */
 const assertPrincipalSegment = (principal) => {
     const problem = segmentProblem(principal);
     if (problem !== null)
         throw new InvalidPrincipalSegmentError(principal, problem);
+    if (!exports.PRINCIPAL_ID_RE.test(principal)) {
+        throw new InvalidPrincipalSegmentError(principal, 'not a principal id (lowercase, dotted)');
+    }
     return principal;
 };
 exports.assertPrincipalSegment = assertPrincipalSegment;

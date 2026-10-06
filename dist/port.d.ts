@@ -63,7 +63,14 @@ export interface GrantSpaceParams {
     /** R3-98 S3/S4 — the **named principal** this grant is minted under (design 05a
      *  §3.1). Written as the `principal` field so the mount-admission gate re-checks
      *  it (a grant fires only under the principal it was minted with). Optional +
-     *  additive: omitted ⇒ no field ⇒ a legacy/grandfathered grant. */
+     *  additive: omitted ⇒ no field ⇒ a legacy/grandfathered grant.
+     *
+     *  R3-692: `mintConsentedGrants` now passes the RAW frame principal here whenever its
+     *  caller gives one (a stage mint then carries `principal: 'stage'`, not no field).
+     *  ADAPTER CONTRACT, as on {@link GrantNetFetchParams.principal}: an adapter that
+     *  cannot store it MUST NOT write the grant bare (a bare grant is grandfathered under
+     *  every principal); `mintConsentedGrants` only hands a principal to a store that
+     *  sets {@link MintStore.principalKeyedConsent}. */
     principal?: string;
 }
 /** Parameters for `MintStore.grantNetFetchHosts` — the per-(user, app) granted
@@ -130,4 +137,12 @@ export interface MintStore {
      *  `capabilitiesOk:false`) rather than silently dropping them — the exact
      *  validate-then-drop bug R3-233 fixes. */
     grantAppCapabilities?(params: GrantAppCapabilitiesParams): Promise<void>;
+    /** R3-692 — the adapter stores principal-keyed consent: it honours `principal` on
+     *  {@link GrantNetFetchParams}, {@link GrantAppCapabilitiesParams} AND
+     *  {@link GrantSpaceParams}. `mintConsentedGrants` refuses to hand a principal to a
+     *  store without this marker (that mint fails closed through `onError`), because a
+     *  0.2.0-shaped adapter would destructure the params, drop `principal`, and write the
+     *  mint at the bare (stage) key — the cross-principal bleed R3-692 closes. Opt-in,
+     *  so the TypeScript shape alone can never vouch for an adapter. */
+    readonly principalKeyedConsent?: true;
 }

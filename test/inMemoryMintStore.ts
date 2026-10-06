@@ -35,6 +35,8 @@ export interface MintedGrant {
 }
 
 export class InMemoryMintStore implements MintStore {
+  /** Keys every record by (uid, appKey, principal) — so it declares the marker. */
+  readonly principalKeyedConsent = true as const;
   calls: { method: string; args: unknown }[] = [];
   private seq = 0;
   private grants = new Map<string, MintedGrant>();

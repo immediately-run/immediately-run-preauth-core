@@ -118,9 +118,17 @@ export declare class InvalidPrincipalSegmentError extends Error {
     readonly code = "invalid-principal";
     constructor(principal: unknown, why: string);
 }
-/** Refuse a principal that is not exactly one path segment — the chokepoint every
- *  consent path builder runs on its principal (R3-692), and what the backend runs on
- *  a `principal` taken from a request body. Returns the principal so it can wrap a
+/** The principal-id grammar (site-main PRINCIPALS registry, CA-3): a dotted chain of
+ *  lowercase-alphanumeric(-hyphen) segments. It excludes everything the grant-key and
+ *  doc-id compositions use as a delimiter or Firestore treats specially: `/`, `~`
+ *  ({@link GRANT_DOCID_DELIM}), `::` (the cascade key `${appKey}::${P}::net:fetch`),
+ *  uppercase, `.`/`..`, empty and `__…__`. */
+export declare const PRINCIPAL_ID_RE: RegExp;
+/** Refuse a principal that is not a principal id — the chokepoint every principal-
+ *  qualified builder runs ({@link appConsentPath}, {@link grantDocId}; R3-692), and what
+ *  the backend runs on a `principal` taken from a request body. Stricter than a path-
+ *  segment check: a `~`/`::`-bearing principal is one segment but would mis-split the
+ *  space-grant doc-id or the cascade key. Returns the principal so it can wrap a
  *  segment in place. */
 export declare const assertPrincipalSegment: (principal: string) => string;
 /** The doc that holds one (user, appKey, principal)'s net:fetch + plain-capability

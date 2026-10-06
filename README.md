@@ -29,33 +29,40 @@ the frame the consent was given in, not by the app alone. One appKey running as 
 stage and as a named-principal region (say `editor.tools`) holds two separate consents,
 and neither satisfies the other's gate.
 
-| Principal | Consent document | Cascade parent key (site-main `netFetchGrantKey`) |
+| Principal | Consent document | Cascade parent key (built by the consumer — site-main `netFetchGrantKey`, from R3-692's site-main leg) |
 |---|---|---|
 | stage, legacy (unkeyed), or none | `user-app-spaces/{uid}/apps/{appKey}` (unchanged) | `${appKey}::net:fetch` |
 | a qualifying named principal `P` | `user-app-spaces/{uid}/apps/{appKey}/consents/{P}` | `${appKey}::${P}::net:fetch` |
 
 Each has a tenant twin under `tenants/{tenantId}/`. Both documents carry the same field
-set, built by the same field builders (`netFetch`, `netFetchGrantedAt`,
-`netFetchLastUsedAt`, `grantedCapabilities`, `capabilitiesGrantedAt`,
-`capabilitiesLastUsedAt`, `held`). A writer of `consents/{P}` also merges
+set: the builders here emit `netFetch`, `netFetchGrantedAt`, `netFetchLastUsedAt`,
+`grantedCapabilities`, `capabilitiesGrantedAt` and `capabilitiesLastUsedAt`, and the
+consumer writes `held` itself. A writer of `consents/{P}` also merges
 `appKeyTouchFields` onto the parent `apps/{appKey}`, so listings, the audit view and the
 namespace sweep still find the app.
 
 - **Builders:** `appConsentPath(uid, appKey, qualifyingPrincipal?)` and
   `tenantAppConsentPath(tenantId, uid, appKey, qualifyingPrincipal?)`. With no principal
   they return exactly `appKeyPath` / `tenantAppKeyPath`. `CONSENTS_COLLECTION` is
-  `'consents'`. `assertPrincipalSegment` refuses a principal that is not one path
-  segment (empty, `/`-bearing, `.`/`..`), throwing `InvalidPrincipalSegmentError`
-  (`code: 'invalid-principal'`). The appKey is asserted first. These are grammar only:
+  `'consents'`. `assertPrincipalSegment` refuses anything that is not a principal id
+  (`PRINCIPAL_ID_RE`, the PRINCIPALS registry's CA-3 grammar: lowercase dotted
+  segments), so `/`, `~`, `::`, uppercase, empty, `.`/`..` and `__…__` are all refused
+  with `InvalidPrincipalSegmentError` (`code: 'invalid-principal'`). `grantDocId` runs
+  the same check on a qualifying principal. The appKey is asserted first. These are grammar only:
   the caller decides which principals qualify.
 - **Mint path:** `mintConsentedGrants(..., capabilities, principal?)` passes the **raw**
   principal to `grantNetFetchHosts`, `grantAppCapabilities` and `grantSpaceToApp`. The
   adapter qualifies it. The key is spread only when defined, so a call without a
   principal produces exactly the 0.2.0 parameter objects. M1 `applyPreAuth` passes
   none: a policy grant is the stage's.
-- **Adapter contract:** an adapter that cannot store principal-keyed consent MUST throw
-  when it is given a principal. It must never write the grant bare, because the bare
-  document is the stage's consent.
+- **Adapter contract, enforced:** a store declares `principalKeyedConsent: true` when it
+  honours `principal` on all three grant methods. `mintConsentedGrants` hands a principal
+  only to such a store; for any other store each principal-carrying mint fails closed
+  (`onError`, `ok: false`) and nothing is written, because a 0.2.0-shaped adapter would
+  drop the field and write the grant bare, where the stage reads it.
+- **Release order:** a consumer sets the marker in the same change that makes its adapter
+  store principal-keyed consent, and only then passes a principal. Bumping to 0.3.0
+  alone changes nothing: without a principal every call is the 0.2.0 call.
 - **Migration:** nothing is copied. The stage reads the app doc as before. A named
   principal reads only `consents/{P}`, which does not exist yet for any user, so it
   re-prompts once.

@@ -71,4 +71,29 @@ describe('mintConsentedGrants — the consent principal (R3-692)', () => {
     expect(store.getNetFetchHosts(UID, APP)).toEqual([host('https://api.example.com')]);
     expect(store.getAppCapabilities(UID, APP)).toEqual(['llm:chat']);
   });
+
+  it('a store that does not declare principalKeyedConsent is refused every principal-carrying mint, never written bare', async () => {
+    // A 0.2.0-shaped adapter: implements the methods, drops unknown params, no marker.
+    const writes: { method: string; args: unknown }[] = [];
+    const legacy = {
+      createSpace: async () => 'space-new',
+      grantSpaceToApp: async (a: unknown) => void writes.push({ method: 'grantSpaceToApp', args: a }),
+      grantNetFetchHosts: async (a: unknown) => void writes.push({ method: 'grantNetFetchHosts', args: a }),
+      grantAppCapabilities: async (a: unknown) => void writes.push({ method: 'grantAppCapabilities', args: a }),
+    };
+    const errors: string[] = [];
+    const res = await mintConsentedGrants(
+      legacy, UID, APP, [pick, create], [host('https://api.example.com')], 'interactive',
+      (msg) => errors.push(msg), ['llm:chat'], 'editor.tools',
+    );
+    expect(writes).toEqual([]);
+    expect(res).toEqual({ ok: false, netFetchOk: false, capabilitiesOk: false, minted: [] });
+    expect(errors).toHaveLength(4); // net:fetch, capabilities, and both selections
+    // The same store with no principal mints as 0.2.0 did.
+    const ok = await mintConsentedGrants(
+      legacy, UID, APP, [pick], [host('https://api.example.com')], 'interactive', undefined, ['llm:chat'],
+    );
+    expect(ok.ok).toBe(true);
+    expect(writes.map((w) => w.method).sort()).toEqual(['grantAppCapabilities', 'grantNetFetchHosts', 'grantSpaceToApp']);
+  });
 });

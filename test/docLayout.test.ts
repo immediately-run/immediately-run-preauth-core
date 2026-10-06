@@ -467,7 +467,22 @@ describe('docLayout — principal-keyed consent doc (R3-692)', () => {
       expect((e as { code?: string }).code).toBe('invalid-principal');
     }
     expect(L.assertPrincipalSegment('editor.tools')).toBe('editor.tools');
+    expect(L.assertPrincipalSegment('app.file-picker')).toBe('app.file-picker');
+    // Not a principal id (CA-3): the grant-key and doc-id delimiters, uppercase and
+    // Firestore's reserved __…__ ids are one path segment each, yet refused.
+    for (const bad of ['a::b', 'x~y', 'Editor.tools', '__name__', 'editor..tools', '.editor', 'editor.']) {
+      expect(() => L.assertPrincipalSegment(bad)).toThrow(L.InvalidPrincipalSegmentError);
+    }
     // A bad appKey AND a bad principal: the appKey error wins (asserted first).
     expect(() => L.appConsentPath('u', 'github:acme/notes', 'editor/tools')).toThrow(InvalidAppKeyError);
+  });
+
+  it('grantDocId runs the same principal check, so a principal cannot split the space-grant doc-id', () => {
+    expect(L.grantDocId('sp1', 'editor.tools')).toBe('editor.tools~sp1');
+    expect(L.grantDocId('sp1')).toBe('sp1');
+    expect(L.grantDocId('sp1', '')).toBe('sp1'); // unchanged: falsy ⇒ the bare (stage) id
+    for (const bad of ['a/b/c', 'x~y', 'a::b']) {
+      expect(() => L.grantDocId('sp1', bad)).toThrow(L.InvalidPrincipalSegmentError);
+    }
   });
 });

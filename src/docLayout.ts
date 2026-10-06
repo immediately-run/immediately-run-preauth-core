@@ -106,7 +106,9 @@ export const GRANT_DOCID_DELIM = '~';
  *  qualify" (site-main maps stage/legacy → undefined) so this stays a pure string
  *  builder with no sentinel knowledge. */
 export const grantDocId = (spaceId: string, qualifyingPrincipal?: string): string =>
-  qualifyingPrincipal ? `${qualifyingPrincipal}${GRANT_DOCID_DELIM}${spaceId}` : spaceId;
+  qualifyingPrincipal
+    ? `${assertPrincipalSegment(qualifyingPrincipal)}${GRANT_DOCID_DELIM}${spaceId}`
+    : spaceId;
 
 /** A parsed grant doc-id — the §3.5 reader-parse discipline. `principal` is set
  *  only for a QUALIFIED (`${principal}~${spaceId}`) id; a bare id (a stage/legacy
@@ -289,13 +291,25 @@ export class InvalidPrincipalSegmentError extends Error {
   }
 }
 
-/** Refuse a principal that is not exactly one path segment — the chokepoint every
- *  consent path builder runs on its principal (R3-692), and what the backend runs on
- *  a `principal` taken from a request body. Returns the principal so it can wrap a
+/** The principal-id grammar (site-main PRINCIPALS registry, CA-3): a dotted chain of
+ *  lowercase-alphanumeric(-hyphen) segments. It excludes everything the grant-key and
+ *  doc-id compositions use as a delimiter or Firestore treats specially: `/`, `~`
+ *  ({@link GRANT_DOCID_DELIM}), `::` (the cascade key `${appKey}::${P}::net:fetch`),
+ *  uppercase, `.`/`..`, empty and `__…__`. */
+export const PRINCIPAL_ID_RE = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
+
+/** Refuse a principal that is not a principal id — the chokepoint every principal-
+ *  qualified builder runs ({@link appConsentPath}, {@link grantDocId}; R3-692), and what
+ *  the backend runs on a `principal` taken from a request body. Stricter than a path-
+ *  segment check: a `~`/`::`-bearing principal is one segment but would mis-split the
+ *  space-grant doc-id or the cascade key. Returns the principal so it can wrap a
  *  segment in place. */
 export const assertPrincipalSegment = (principal: string): string => {
   const problem = segmentProblem(principal);
   if (problem !== null) throw new InvalidPrincipalSegmentError(principal, problem);
+  if (!PRINCIPAL_ID_RE.test(principal)) {
+    throw new InvalidPrincipalSegmentError(principal, 'not a principal id (lowercase, dotted)');
+  }
   return principal;
 };
 
