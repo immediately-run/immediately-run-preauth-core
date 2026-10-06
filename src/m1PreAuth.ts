@@ -72,7 +72,7 @@ import {
   type Capability,
 } from './capabilities';
 import { mintConsentedGrants, type ConsentSelection, type MintErrorSink, type MintResult } from './bootConsent';
-import type { MintStore, NetFetchHost } from './port';
+import { STAGE_PRINCIPAL, type MintStore, type NetFetchHost } from './port';
 
 export type PreAuthRefusalReason =
   /** A non-app-scoped elevated cap — region-binding-only authority (§8.9). */
@@ -222,6 +222,12 @@ export async function applyPreAuth(
   // rung they are excluded from the plain mint and minted nowhere. `netFetchHosts`
   // is the only parameter mint input this flow carries today.
   const plainCaps = plan.grantable.filter((c) => !isHostParameterized(c));
+  // R3-1019 — a policy mint is the STAGE's grant: stamp it so the write is keyed
+  // (`principal: 'stage'`) rather than principal-less (LEGACY_UNKEYED — grandfathered
+  // under every principal until R3-703's 2026-10-31 end date). Only a store that
+  // declares `principalKeyedConsent` may receive the field — `mintConsentedGrants`
+  // refuses a principal to any other (fail-closed), so an unmarked store keeps
+  // today's unstamped call.
   const mint = await mintConsentedGrants(
     store,
     uid,
@@ -231,6 +237,7 @@ export async function applyPreAuth(
     'policy',
     onError,
     plainCaps,
+    store.principalKeyedConsent === true ? STAGE_PRINCIPAL : undefined,
   );
   return { ok: mint.ok, refused: [], mint };
 }

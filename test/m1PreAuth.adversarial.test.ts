@@ -8,7 +8,7 @@
 
 import { InMemoryMintStore } from './inMemoryMintStore';
 import { applyPreAuth } from '../src/m1PreAuth';
-import type { NetFetchHost } from '../src/port';
+import { STAGE_PRINCIPAL, type NetFetchHost } from '../src/port';
 
 const UID = 'u-policy';
 // A URL-loaded (previewed) app — NOT a pinned first-party region. The §8.9 target
@@ -73,7 +73,7 @@ describe('M1 — a clean app-scoped pre-auth lands durable grants with policy pr
     });
     expect(res.ok).toBe(true);
     expect(res.refused).toEqual([]);
-    expect(store.getNetFetchHosts(UID, APP_KEY)).toEqual([host('https://api.example.com')]);
+    expect(store.getNetFetchHosts(UID, APP_KEY, STAGE_PRINCIPAL)).toEqual([host('https://api.example.com')]);
     const grants = store.listGrants(UID);
     expect(grants).toHaveLength(1);
     expect(grants[0].mintPath).toBe('policy');
@@ -94,7 +94,7 @@ describe('M1 — plain app-scoped capability grants (R3-233)', () => {
     });
     expect(res.ok).toBe(true);
     expect(res.mint?.capabilitiesOk).toBe(true);
-    expect(store.getAppCapabilities(UID, APP_KEY)).toEqual(['llm:chat', 'task:invoke']);
+    expect(store.getAppCapabilities(UID, APP_KEY, STAGE_PRINCIPAL)).toEqual(['llm:chat', 'task:invoke']);
     const call = store.calls.find((c) => c.method === 'grantAppCapabilities')!;
     expect((call.args as { mintPath: string }).mintPath).toBe('policy');
   });
@@ -107,8 +107,8 @@ describe('M1 — plain app-scoped capability grants (R3-233)', () => {
       netFetchHosts: [host('https://api.example.com')],
     });
     // net:fetch lives ONLY in the (bounded) host set; the bare-cap set holds llm:chat only.
-    expect(store.getAppCapabilities(UID, APP_KEY)).toEqual(['llm:chat']);
-    expect(store.getNetFetchHosts(UID, APP_KEY)).toEqual([host('https://api.example.com')]);
+    expect(store.getAppCapabilities(UID, APP_KEY, STAGE_PRINCIPAL)).toEqual(['llm:chat']);
+    expect(store.getNetFetchHosts(UID, APP_KEY, STAGE_PRINCIPAL)).toEqual([host('https://api.example.com')]);
   });
 
   it('FAILS LOUD (never validate-then-drop) when the store cannot mint caps', async () => {
