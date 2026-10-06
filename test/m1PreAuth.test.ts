@@ -317,7 +317,9 @@ describe('applyPreAuth (M1 write path)', () => {
       'grantNetFetchHosts', 'grantAppCapabilities', 'grantSpaceToApp',
     ]);
     for (const c of stamped) expect((c.args as { principal?: string }).principal).toBe(STAGE_PRINCIPAL);
-    // …and the stored space grant keys under the stage principal, not the absent key.
+    // …and the stored space grant carries the stage principal FIELD at the shared
+    // bare key ('stage' qualifies to the absent key, as production's
+    // qualifyingSpacePrincipal rules — the field, not the key, is what changed).
     expect(store.listGrants('u1').map((g) => g.principal)).toEqual([STAGE_PRINCIPAL]);
   });
 });
