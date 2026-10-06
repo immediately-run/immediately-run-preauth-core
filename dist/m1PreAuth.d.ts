@@ -1,6 +1,6 @@
 import { type Capability } from './capabilities';
 import { type ConsentSelection, type MintErrorSink, type MintResult } from './bootConsent';
-import type { MintStore, NetFetchHost } from './port';
+import { type MintStore, type NetFetchHost } from './port';
 export type PreAuthRefusalReason = 
 /** A non-app-scoped elevated cap — region-binding-only authority (§8.9). */
 'broad-elevated'

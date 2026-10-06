@@ -10,7 +10,8 @@ import {
 } from '../src/m1PreAuth';
 import { CAPABILITIES } from '../src/capabilities';
 import type { ConsentSelection } from '../src/bootConsent';
-import type { MintStore, NetFetchHost } from '../src/port';
+import { STAGE_PRINCIPAL, type MintStore, type NetFetchHost } from '../src/port';
+import { InMemoryMintStore } from './inMemoryMintStore';
 
 const host = (origin: string): NetFetchHost => ({ origin });
 
@@ -281,10 +282,11 @@ describe('applyPreAuth (M1 write path)', () => {
     expect(calls.some((c) => c.method === 'grantAppCapabilities')).toBe(false);
   });
 
-  // R3-692: M1 policy grants are the stage's — every mint reaches the store with no
-  // `principal` key at all (not even `principal: undefined`), so the adapter writes
-  // the bare app doc exactly as 0.2.0 did.
-  it('applyPreAuth mints with no principal (policy = stage)', async () => {
+  // R3-692, as amended by R3-1019: an UNMARKED store (no `principalKeyedConsent`)
+  // keeps the 0.2.0 call shape — every mint reaches it with no `principal` key at
+  // all (not even `principal: undefined`), because mintConsentedGrants refuses a
+  // principal to a store that cannot key it.
+  it('applyPreAuth mints with no principal to an UNMARKED store', async () => {
     const store = fakeStore();
     const res = await applyPreAuth(store, 'u1', 'app', {
       capabilities: ['net:fetch', 'task:invoke'],
@@ -296,5 +298,28 @@ describe('applyPreAuth (M1 write path)', () => {
       'grantNetFetchHosts', 'grantAppCapabilities', 'createSpace', 'grantSpaceToApp',
     ]);
     for (const c of calls) expect(Object.keys(c.args as object)).not.toContain('principal');
+  });
+
+  // R3-1019: a policy grant is the STAGE's — to a principal-keyed store every M1
+  // mint (space, capability, net:fetch host) carries `principal: 'stage'`, so the
+  // write is keyed instead of LEGACY_UNKEYED (grandfathered under every principal
+  // until R3-703's end date).
+  it('applyPreAuth stamps the stage principal on every mint to a principal-keyed store', async () => {
+    const store = new InMemoryMintStore();
+    const res = await applyPreAuth(store, 'u1', 'app', {
+      capabilities: ['task:invoke'],
+      mounts: [create],
+      netFetchHosts: [host('https://api.example.com')],
+    });
+    expect(res.ok).toBe(true);
+    const stamped = store.calls.filter((c) => c.method !== 'createSpace'); // createSpace is not a consent record
+    expect(stamped.map((c) => c.method)).toEqual([
+      'grantNetFetchHosts', 'grantAppCapabilities', 'grantSpaceToApp',
+    ]);
+    for (const c of stamped) expect((c.args as { principal?: string }).principal).toBe(STAGE_PRINCIPAL);
+    // …and the stored space grant carries the stage principal FIELD at the shared
+    // bare key ('stage' qualifies to the absent key, as production's
+    // qualifyingSpacePrincipal rules — the field, not the key, is what changed).
+    expect(store.listGrants('u1').map((g) => g.principal)).toEqual([STAGE_PRINCIPAL]);
   });
 });
