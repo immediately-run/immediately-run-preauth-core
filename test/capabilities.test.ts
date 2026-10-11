@@ -497,9 +497,9 @@ describe('workspace:read — the baseline workspace-identity read (R3-491)', () 
     expect(tierOf('workspace:read')).toBe('baseline');
     expect(isBaseline('workspace:read')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('workspace:read');
-    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634) — the
+    // The global pin moved on to the NEWEST row (llm:model, 1.20.0 — R3-1127) — the
     // workspace row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.19.0');
+    expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
   it('is baseline because the SAME coordinates already ride `route:read`', () => {
@@ -550,9 +550,9 @@ describe('theme:sources — the elevated theme-registry verbs (R3-500)', () => {
     expect(tierOf('theme:sources')).toBe('elevated');
     expect(isBaseline('theme:sources')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('theme:sources');
-    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634) — the
+    // The global pin moved on to the NEWEST row (llm:model, 1.20.0 — R3-1127) — the
     // theme:sources row's own `since` is unchanged.
-    expect(REGISTRY_VERSION).toBe('1.19.0');
+    expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
   it('is NOT app-scoped — the picker-provenance rule is the consent mechanism', () => {
@@ -595,8 +595,8 @@ describe('storage:local — the baseline device-local store open verb (R3-558)',
     expect(tierOf('storage:local')).toBe('baseline');
     expect(isBaseline('storage:local')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('storage:local');
-    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634).
-    expect(REGISTRY_VERSION).toBe('1.19.0');
+    // The global pin moved on to the NEWEST row (llm:model, 1.20.0 — R3-1127).
+    expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
   it('is NOT app-scoped and not parameterized — an app can only open its own', () => {
@@ -638,8 +638,8 @@ describe('link:open — the baseline outward-link action (R3-619)', () => {
     expect(tierOf('link:open')).toBe('baseline');
     expect(isBaseline('link:open')).toBe(true);
     expect(BASELINE_CAPABILITIES).toContain('link:open');
-    // The global pin moved on to the NEWEST row (the room set, 1.19.0 — R3-634).
-    expect(REGISTRY_VERSION).toBe('1.19.0');
+    // The global pin moved on to the NEWEST row (llm:model, 1.20.0 — R3-1127).
+    expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
   it('is baseline because linking outward is ordinary — the PER-CALL confirmation is the protection', () => {
@@ -684,7 +684,15 @@ describe('llm:chooseModel — the elevated, non-app-scoped read (R3-620)', () =>
     expect(tierOf('llm:chooseModel')).toBe('elevated');
     expect(isBaseline('llm:chooseModel')).toBe(false);
     expect(BASELINE_CAPABILITIES).not.toContain('llm:chooseModel');
-    // The global pin lives with the NEWEST row — the room set at 1.19.0 (R3-634).
+    // The global pin lives with the NEWEST row — llm:model at 1.20.0 (R3-1127).
+  });
+
+  it('llm:model (R3-1127) — the non-chat kinds, elevated + app-scoped like llm:chat', () => {
+    expect(isKnownCapability('llm:model')).toBe(true);
+    expect(CAPABILITIES['llm:model']).toEqual({ kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true });
+    expect(isAppScoped('llm:model')).toBe(true);
+    expect(APP_SCOPED_CAPABILITIES).toContain('llm:model');
+    expect(isBaseline('llm:model')).toBe(false);
   });
 
   it('is NOT app-scoped — a stage app is refused with no prompt, not earnable by consent', () => {
@@ -728,7 +736,7 @@ describe('the REALTIME_MESSAGING §7 room capabilities (R3-634, R-0)', () => {
       expect(CAPABILITIES[cap].since).toBe('1.19.0');
     }
     // The global pin lives with the NEWEST row (the room set).
-    expect(REGISTRY_VERSION).toBe('1.19.0');
+    expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
   it('kinds follow the §7 table: room:read and presence:read are reads, the rest actions', () => {

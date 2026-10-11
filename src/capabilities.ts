@@ -52,6 +52,10 @@ export type Capability =
   | 'agent:session'
   | 'diagnostics:read'
   | 'llm:chat'
+  // R3-1127 (LLM_AND_AGENTS_SPEC §4.4): the NON-CHAT model kinds — embeddings, images,
+  // speech, transcription, video, reranking — behind one capability so each later kind
+  // is a method, not a redesign.
+  | 'llm:model'
   | 'authoring:run'
   | 'analytics:emit'
   | 'device:geolocation'
@@ -431,6 +435,13 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // Elevated + app-scoped: a fork/previewed app EARNS it via lazy/manifest consent
   // (the fork-needs-more-caps story), recorded as a per-(user,appKey) §8.15 grant.
   'llm:chat': { kind: 'action', tier: 'elevated', since: '1.3.0', appScoped: true },
+  // LLM_AND_AGENTS_SPEC §4.4 (R3-1127): invoke the connected providers' NON-CHAT models
+  // (embeddings first; image/speech/transcription/video/reranking are later methods on
+  // the same gate). Same shape as `llm:chat` and for the same reason: the host resolves
+  // the provider from the user's key, injects it host-side, and the app never names a
+  // vendor or sees the key. Elevated + app-scoped; consent copy "Use your connected
+  // models for embeddings, images, speech and video".
+  'llm:model': { kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true },
   // Authoring services (CLIENT_SERVICES_SPEC §6, R3-107): typecheck/lint/format
   // source via a kernel-owned same-origin worker (the in-browser coding agent's
   // quality tools, LLM_AND_AGENTS §3.3). Baseline action — the worker only
@@ -786,7 +797,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.19.0';
+export const REGISTRY_VERSION = '1.20.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {
