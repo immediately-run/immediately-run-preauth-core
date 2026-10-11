@@ -71,7 +71,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  Prior notes — bumped to 1.20.0 with the ELEVATED, app-scoped `llm:model`
  *  (LLM_AND_AGENTS_SPEC §4.4 — R3-1127, the non-chat model kinds; inert on a host
  *  whose methods have not landed, and a 1.19.0 host refuses a binding that requests
- *  it (T26) rather than mounting half-gated). 1.19.0 shipped in 0.4.0.
+ *  it (T26) rather than mounting half-gated). 1.19.0 shipped in 0.1.26.
  *
  *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
  *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,

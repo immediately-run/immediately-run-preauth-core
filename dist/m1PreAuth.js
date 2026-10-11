@@ -46,10 +46,11 @@
 // stated here so the boundary is read rather than inferred from a stale example list.
 //
 // Not overstating it, in three directions:
-//   - `net:fetch` and `feed:fetch` are HOST-PARAMETERIZED, so a pre-auth conveys their
-//     parameter set (hosts / compiled templates), never a bare "may fetch". The other
-//     nine are plain on/off grants. `applyPreAuth` filters the parameterized ones out
-//     of the plain-cap mint below.
+//   - SEVEN of the nineteen are HOST-PARAMETERIZED — `net:fetch` and `feed:fetch`,
+//     plus the five R3-634 room rows other than `room:create` — so a pre-auth conveys
+//     their parameter set (hosts / compiled templates), never a bare "may fetch". The
+//     other twelve are plain on/off grants. `applyPreAuth` filters the parameterized
+//     ones out of the plain-cap mint below.
 //   - M1 clamps WHO may hold a capability, not what the capability then does. A
 //     pre-granted `device:camera` still opens the device through the host's own capture
 //     surface, under the host-chrome indicator the app cannot cover (G-DEV-5); it does
