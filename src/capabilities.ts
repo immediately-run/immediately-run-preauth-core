@@ -52,6 +52,10 @@ export type Capability =
   | 'agent:session'
   | 'diagnostics:read'
   | 'llm:chat'
+  // R3-1127 (LLM_AND_AGENTS_SPEC §4.4): the NON-CHAT model kinds — embeddings, images,
+  // speech, transcription, video, reranking — behind one capability so each later kind
+  // is a method, not a redesign.
+  | 'llm:model'
   | 'authoring:run'
   | 'analytics:emit'
   | 'device:geolocation'
@@ -121,13 +125,14 @@ export interface CapabilityDef {
    *  **The app-scoped set, in full** — this is a security boundary, so it is stated
    *  completely rather than by example. The authoritative form is DERIVED, never
    *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-   *  and `isAppScoped` is what every consumer branches on. As of registry 1.19.0 the
-   *  eighteen rows carrying it are:
+   *  and `isAppScoped` is what every consumer branches on. As of registry 1.20.0 the
+   *  nineteen rows carrying it are:
    *
    *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
    *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
    *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
-   *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
+   *    `llm:chat` (D5) · `llm:model` (R3-1127, the non-chat kinds) · `analytics:emit`
+   *    (R3-350) · `device:geolocation` (R3-424) ·
    *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485) ·
    *    `room:create`, `room:read`, `room:write`, `presence:read`, `presence:set` and
    *    `notify:member` (R3-634, the REALTIME_MESSAGING §7 room set).
@@ -138,7 +143,7 @@ export interface CapabilityDef {
    *  capability: the durable authority IS their parameter set. `task:invoke` and
    *  `analytics:emit` are `parameterized` but bounded by the manifest (`invokes`,
    *  §5.8) and the baked-in vocabulary hash respectively — not durable grant params —
-   *  so both ARE plain on/off grants. The remaining nine are plain on/off grants as
+   *  so both ARE plain on/off grants. The remaining ten are plain on/off grants as
    *  well. That distinction bounds what a grant CONVEYS; it does not narrow who may
    *  earn one, which is what `appScoped` decides. */
   appScoped?: boolean;
@@ -431,6 +436,13 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
   // Elevated + app-scoped: a fork/previewed app EARNS it via lazy/manifest consent
   // (the fork-needs-more-caps story), recorded as a per-(user,appKey) §8.15 grant.
   'llm:chat': { kind: 'action', tier: 'elevated', since: '1.3.0', appScoped: true },
+  // LLM_AND_AGENTS_SPEC §4.4 (R3-1127): invoke the connected providers' NON-CHAT models
+  // (embeddings first; image/speech/transcription/video/reranking are later methods on
+  // the same gate). Same shape as `llm:chat` and for the same reason: the host resolves
+  // the provider from the user's key, injects it host-side, and the app never names a
+  // vendor or sees the key. Elevated + app-scoped; consent copy "Use your connected
+  // models for embeddings, images, speech and video".
+  'llm:model': { kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true },
   // Authoring services (CLIENT_SERVICES_SPEC §6, R3-107): typecheck/lint/format
   // source via a kernel-owned same-origin worker (the in-browser coding agent's
   // quality tools, LLM_AND_AGENTS §3.3). Baseline action — the worker only
@@ -699,6 +711,11 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
  *
+ *  Prior notes — bumped to 1.20.0 with the ELEVATED, app-scoped `llm:model`
+ *  (LLM_AND_AGENTS_SPEC §4.4 — R3-1127, the non-chat model kinds; inert on a host
+ *  whose methods have not landed, and a 1.19.0 host refuses a binding that requests
+ *  it (T26) rather than mounting half-gated). 1.19.0 shipped in 0.1.26.
+ *
  *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
  *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,
  *  `room:write`, `presence:read`, `presence:set`, `notify:member` (R3-634, ladder
@@ -786,7 +803,7 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export const REGISTRY_VERSION = '1.19.0';
+export const REGISTRY_VERSION = '1.20.0';
 
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export function isKnownCapability(cap: string): cap is Capability {

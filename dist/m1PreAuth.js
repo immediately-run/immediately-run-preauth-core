@@ -28,13 +28,15 @@
 //
 // WHAT THAT SET ACTUALLY CONTAINS, stated in full because this is the boundary M1
 // pre-grants across WITHOUT A PROMPT. The check reads `isAppScoped`, so the list is
-// derived from the capability table and cannot drift from it; as of registry 1.12.0
-// the eleven app-scoped rows are:
+// derived from the capability table and cannot drift from it; as of registry 1.20.0
+// the nineteen app-scoped rows are:
 //
 //   `auth:identity` (R3-407) · `contribute:self` · `task:invoke` · `net:fetch` ·
-//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `analytics:emit`
-//   (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
-//   `device:microphone` (R3-425).
+//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `llm:model` (R3-1127) ·
+//   `analytics:emit` (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
+//   `device:microphone` (R3-425) · `recents:read` (R3-485) · `room:create`,
+//   `room:read`, `room:write`, `presence:read`, `presence:set` and `notify:member`
+//   (R3-634).
 //
 // So M1 can pre-grant, with no consent modal at boot, not only the original egress and
 // delegation caps but the user's IDENTITY, their LOCATION, and their CAMERA and
@@ -44,10 +46,13 @@
 // stated here so the boundary is read rather than inferred from a stale example list.
 //
 // Not overstating it, in three directions:
-//   - `net:fetch` and `feed:fetch` are HOST-PARAMETERIZED, so a pre-auth conveys their
-//     parameter set (hosts / compiled templates), never a bare "may fetch". The other
-//     nine are plain on/off grants. `applyPreAuth` filters the parameterized ones out
-//     of the plain-cap mint below.
+//   - SEVEN of the nineteen are HOST-PARAMETERIZED, and a pre-auth never conveys a
+//     bare grant for any of them: for `net:fetch` and `feed:fetch` the parameter set
+//     is hosts / compiled templates; for the five R3-634 room rows other than
+//     `room:create` it is the granted room (and, for notify, member) set — and at this
+//     rung those five are excluded from the plain mint and minted nowhere (R-2). The
+//     other twelve are plain on/off grants. `applyPreAuth` filters the parameterized
+//     ones out of the plain-cap mint below.
 //   - M1 clamps WHO may hold a capability, not what the capability then does. A
 //     pre-granted `device:camera` still opens the device through the host's own capture
 //     surface, under the host-chrome indicator the app cannot cover (G-DEV-5); it does
