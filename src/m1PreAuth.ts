@@ -45,9 +45,11 @@
 // stated here so the boundary is read rather than inferred from a stale example list.
 //
 // Not overstating it, in three directions:
-//   - SEVEN of the nineteen are HOST-PARAMETERIZED — `net:fetch` and `feed:fetch`,
-//     plus the five R3-634 room rows other than `room:create` — so a pre-auth conveys
-//     their parameter set (hosts / compiled templates), never a bare "may fetch". The
+//   - SEVEN of the nineteen are HOST-PARAMETERIZED, and a pre-auth never conveys a
+//     bare grant for any of them: for `net:fetch` and `feed:fetch` the parameter set
+//     is hosts / compiled templates; for the five R3-634 room rows other than
+//     `room:create` it is the granted room (and, for notify, member) set — and at this
+//     rung those five are excluded from the plain mint and minted nowhere (R-2). The
 //     other twelve are plain on/off grants. `applyPreAuth` filters the parameterized
 //     ones out of the plain-cap mint below.
 //   - M1 clamps WHO may hold a capability, not what the capability then does. A
