@@ -1,6 +1,6 @@
 export type CapabilityKind = 'read' | 'action';
 export type CapabilityTier = 'baseline' | 'elevated' | 'first-party-only';
-export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone' | 'recents:read' | 'workspace:read' | 'theme:sources' | 'storage:local' | 'link:open' | 'llm:chooseModel' | 'room:create' | 'room:read' | 'room:write' | 'presence:read' | 'presence:set' | 'notify:member';
+export type Capability = 'theme:read' | 'theme:set' | 'auth:status' | 'auth:identity' | 'route:read' | 'formFactor:read' | 'chrome:read' | 'mounts:read' | 'mounts:registry' | 'spaces:app' | 'spaces:user' | 'spaces:admin' | 'settings:app' | 'settings:fork' | 'settings:all' | 'contribute:self' | 'contribute:any' | 'contribute:direct' | 'editor:read' | 'editor:open' | 'editor:reveal' | 'editor:write' | 'editor:document' | 'editor:requestEdit' | 'vcs:read' | 'vcs:reset' | 'dnd:source' | 'catalog:read' | 'commands:read' | 'commands:run' | 'ipc' | 'task:invoke' | 'net:fetch' | 'feed:fetch' | 'secrets:add' | 'secrets:list' | 'secrets:revoke' | 'agent:session' | 'diagnostics:read' | 'llm:chat' | 'llm:model' | 'authoring:run' | 'analytics:emit' | 'device:geolocation' | 'device:camera' | 'device:microphone' | 'recents:read' | 'workspace:read' | 'theme:sources' | 'storage:local' | 'link:open' | 'llm:chooseModel' | 'room:create' | 'room:read' | 'room:write' | 'presence:read' | 'presence:set' | 'notify:member';
 export interface CapabilityDef {
     kind: CapabilityKind;
     tier: CapabilityTier;
@@ -22,13 +22,14 @@ export interface CapabilityDef {
      *  **The app-scoped set, in full** — this is a security boundary, so it is stated
      *  completely rather than by example. The authoritative form is DERIVED, never
      *  hand-maintained: `APP_SCOPED_CAPABILITIES` below filters this table on the flag,
-     *  and `isAppScoped` is what every consumer branches on. As of registry 1.19.0 the
-     *  eighteen rows carrying it are:
+     *  and `isAppScoped` is what every consumer branches on. As of registry 1.20.0 the
+     *  nineteen rows carrying it are:
      *
      *    `auth:identity` (R3-407) · `contribute:self` (decision #1 — its
      *    baseline→elevated reclassification landed in R3-33d) · `task:invoke` ·
      *    `net:fetch` · `feed:fetch` (R3-227) · `diagnostics:read` (R3-74 / P3-72, D4) ·
-     *    `llm:chat` (D5) · `analytics:emit` (R3-350) · `device:geolocation` (R3-424) ·
+     *    `llm:chat` (D5) · `llm:model` (R3-1127, the non-chat kinds) · `analytics:emit`
+     *    (R3-350) · `device:geolocation` (R3-424) ·
      *    `device:camera` and `device:microphone` (R3-425) · `recents:read` (R3-485) ·
      *    `room:create`, `room:read`, `room:write`, `presence:read`, `presence:set` and
      *    `notify:member` (R3-634, the REALTIME_MESSAGING §7 room set).
@@ -39,7 +40,7 @@ export interface CapabilityDef {
      *  capability: the durable authority IS their parameter set. `task:invoke` and
      *  `analytics:emit` are `parameterized` but bounded by the manifest (`invokes`,
      *  §5.8) and the baked-in vocabulary hash respectively — not durable grant params —
-     *  so both ARE plain on/off grants. The remaining nine are plain on/off grants as
+     *  so both ARE plain on/off grants. The remaining ten are plain on/off grants as
      *  well. That distinction bounds what a grant CONVEYS; it does not narrow who may
      *  earn one, which is what `appScoped` decides. */
     appScoped?: boolean;
@@ -66,6 +67,11 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  `device:geolocation` notes below each refused to allow. 1.12.0 is that mistake
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
+ *
+ *  Prior notes — bumped to 1.20.0 with the ELEVATED, app-scoped `llm:model`
+ *  (LLM_AND_AGENTS_SPEC §4.4 — R3-1127, the non-chat model kinds; inert on a host
+ *  whose methods have not landed, and a 1.19.0 host refuses a binding that requests
+ *  it (T26) rather than mounting half-gated). 1.19.0 shipped in 0.4.0.
  *
  *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
  *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,
@@ -154,7 +160,7 @@ export declare const CAPABILITIES: Record<Capability, CapabilityDef>;
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-export declare const REGISTRY_VERSION = "1.19.0";
+export declare const REGISTRY_VERSION = "1.20.0";
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 export declare function isKnownCapability(cap: string): cap is Capability;
 export declare function tierOf(cap: Capability): CapabilityTier;

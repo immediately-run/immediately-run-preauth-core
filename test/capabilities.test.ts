@@ -687,14 +687,6 @@ describe('llm:chooseModel — the elevated, non-app-scoped read (R3-620)', () =>
     // The global pin lives with the NEWEST row — llm:model at 1.20.0 (R3-1127).
   });
 
-  it('llm:model (R3-1127) — the non-chat kinds, elevated + app-scoped like llm:chat', () => {
-    expect(isKnownCapability('llm:model')).toBe(true);
-    expect(CAPABILITIES['llm:model']).toEqual({ kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true });
-    expect(isAppScoped('llm:model')).toBe(true);
-    expect(APP_SCOPED_CAPABILITIES).toContain('llm:model');
-    expect(isBaseline('llm:model')).toBe(false);
-  });
-
   it('is NOT app-scoped — a stage app is refused with no prompt, not earnable by consent', () => {
     // The whole point of the principal scope: `llm:chat` is app-scoped (a stage app
     // earns it), but choosing WHICH model is editing-session authority. Non-app-scoped
@@ -735,7 +727,7 @@ describe('the REALTIME_MESSAGING §7 room capabilities (R3-634, R-0)', () => {
       expect(APP_SCOPED_CAPABILITIES).toContain(cap);
       expect(CAPABILITIES[cap].since).toBe('1.19.0');
     }
-    // The global pin lives with the NEWEST row (the room set).
+    // The global pin lives with the NEWEST row (llm:model, 1.20.0 — R3-1127).
     expect(REGISTRY_VERSION).toBe('1.20.0');
   });
 
@@ -776,5 +768,25 @@ describe('the REALTIME_MESSAGING §7 room capabilities (R3-634, R-0)', () => {
     }
     expect(unsupportedCapabilities([...ROOM_CAPS], '1.18.0')).toEqual([...ROOM_CAPS]);
     expect(unsupportedCapabilities([...ROOM_CAPS], REGISTRY_VERSION)).toEqual([]);
+  });
+});
+
+// R3-1127 (LLM_AND_AGENTS_SPEC §4.4): the non-chat model kinds — one elevated,
+// app-scoped capability for all of them, so each later kind is a method, not a
+// redesign.
+describe('llm:model — the elevated, app-scoped non-chat kinds gate (R3-1127)', () => {
+  it('is a known, elevated, app-scoped action, since 1.20.0', () => {
+    expect(isKnownCapability('llm:model')).toBe(true);
+    expect(CAPABILITIES['llm:model']).toEqual({ kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true });
+    expect(isAppScoped('llm:model')).toBe(true);
+    expect(APP_SCOPED_CAPABILITIES).toContain('llm:model');
+    expect(isBaseline('llm:model')).toBe(false);
+  });
+
+  it('a host on a PRE-llm:model vocabulary is refused, not silently drained (T26)', () => {
+    expect(isSupportedCapability('llm:model', '1.19.0')).toBe(false);
+    expect(isSupportedCapability('llm:model', '1.20.0')).toBe(true);
+    expect(unsupportedCapabilities(['llm:model'], '1.19.0')).toEqual(['llm:model']);
+    expect(unsupportedCapabilities(['llm:model'], REGISTRY_VERSION)).toEqual([]);
   });
 });

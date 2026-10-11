@@ -27,13 +27,15 @@
 //
 // WHAT THAT SET ACTUALLY CONTAINS, stated in full because this is the boundary M1
 // pre-grants across WITHOUT A PROMPT. The check reads `isAppScoped`, so the list is
-// derived from the capability table and cannot drift from it; as of registry 1.12.0
-// the eleven app-scoped rows are:
+// derived from the capability table and cannot drift from it; as of registry 1.20.0
+// the nineteen app-scoped rows are:
 //
 //   `auth:identity` (R3-407) · `contribute:self` · `task:invoke` · `net:fetch` ·
-//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `analytics:emit`
-//   (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
-//   `device:microphone` (R3-425).
+//   `feed:fetch` (R3-227) · `diagnostics:read` · `llm:chat` · `llm:model` (R3-1127) ·
+//   `analytics:emit` (R3-350) · `device:geolocation` (R3-424) · `device:camera` and
+//   `device:microphone` (R3-425) · `recents:read` (R3-485) · `room:create`,
+//   `room:read`, `room:write`, `presence:read`, `presence:set` and `notify:member`
+//   (R3-634).
 //
 // So M1 can pre-grant, with no consent modal at boot, not only the original egress and
 // delegation caps but the user's IDENTITY, their LOCATION, and their CAMERA and

@@ -297,6 +297,13 @@ exports.CAPABILITIES = {
     // Elevated + app-scoped: a fork/previewed app EARNS it via lazy/manifest consent
     // (the fork-needs-more-caps story), recorded as a per-(user,appKey) §8.15 grant.
     'llm:chat': { kind: 'action', tier: 'elevated', since: '1.3.0', appScoped: true },
+    // LLM_AND_AGENTS_SPEC §4.4 (R3-1127): invoke the connected providers' NON-CHAT models
+    // (embeddings first; image/speech/transcription/video/reranking are later methods on
+    // the same gate). Same shape as `llm:chat` and for the same reason: the host resolves
+    // the provider from the user's key, injects it host-side, and the app never names a
+    // vendor or sees the key. Elevated + app-scoped; consent copy "Use your connected
+    // models for embeddings, images, speech and video".
+    'llm:model': { kind: 'action', tier: 'elevated', since: '1.20.0', appScoped: true },
     // Authoring services (CLIENT_SERVICES_SPEC §6, R3-107): typecheck/lint/format
     // source via a kernel-owned same-origin worker (the in-browser coding agent's
     // quality tools, LLM_AND_AGENTS §3.3). Baseline action — the worker only
@@ -562,6 +569,11 @@ exports.CAPABILITIES = {
  *  undone, not a second one: 1.10.0 and 1.11.0 keep the vocabularies the docs already
  *  record for them.
  *
+ *  Prior notes — bumped to 1.20.0 with the ELEVATED, app-scoped `llm:model`
+ *  (LLM_AND_AGENTS_SPEC §4.4 — R3-1127, the non-chat model kinds; inert on a host
+ *  whose methods have not landed, and a 1.19.0 host refuses a binding that requests
+ *  it (T26) rather than mounting half-gated). 1.19.0 shipped in 0.4.0.
+ *
  *  Prior notes — bumped to 1.19.0 with the six ELEVATED, app-scoped room
  *  capabilities of REALTIME_MESSAGING_SPEC §7 — `room:create`, `room:read`,
  *  `room:write`, `presence:read`, `presence:set`, `notify:member` (R3-634, ladder
@@ -649,7 +661,7 @@ exports.CAPABILITIES = {
  *  A host older than 1.8.0 therefore refuses a binding that requests `feed:fetch` (T26)
  *  rather than mounting half-working, which is the right outcome: a host that cannot
  *  enforce target-fixing must not run a connector that assumes it. */
-exports.REGISTRY_VERSION = '1.19.0';
+exports.REGISTRY_VERSION = '1.20.0';
 /** Is `cap` a known host-core capability? (Closed vocabulary — §5.12.) */
 function isKnownCapability(cap) {
     return Object.prototype.hasOwnProperty.call(exports.CAPABILITIES, cap);
